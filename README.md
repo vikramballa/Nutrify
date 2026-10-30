@@ -168,8 +168,7 @@ npm run db:backfill-nutrition -w apps/api               # recompute nutrition af
 npm run db:seed:reviewer -w apps/api                    # App Review demo account (REVIEW_EMAIL / REVIEW_PASSWORD)
 ```
 
-Always use migrations. **Never `prisma db push`**. For connecting with pgAdmin
-and browsing the tables, see [`DATABASE.md`](DATABASE.md).
+Always use migrations. **Never `prisma db push`**.
 
 ### Brand assets
 

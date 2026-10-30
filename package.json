@@ -1,0 +1,19 @@
+{
+  "name": "nutrichef",
+  "private": true,
+  "version": "2.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "db:setup": "npm run db:setup -w apps/api",
+    "db:import": "npm run db:import -w apps/api",
+    "dev:api": "npm run dev -w apps/api",
+    "dev:mobile": "npm run start -w apps/mobile",
+    "typecheck": "npm run typecheck -w apps/api",
+    "test": "npm test --workspaces --if-present",
+    "build": "npm run build -w packages/shared && npm run build -w apps/api",
+    "postinstall": "npm run build -w packages/shared --if-present"
+  }
+}

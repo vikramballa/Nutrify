@@ -1,0 +1,297 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  // pg_trgm backs the GIN index on Recipe.nameLower: recipe search is a
+  // `contains` (LIKE '%term%'), which a plain btree index cannot serve.
+  extensions = [pg_trgm]
+}
+
+model User {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  passwordHash String
+  deviceId     String?         @unique
+  name         String          @default("Sarah")
+  onboarded    Boolean         @default(false)
+  age          Int?
+  heightCm     Float?
+  weightKg     Float?
+  sex          String? // 'male' | 'female'
+  activityLevel String? // 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
+  goal         String? // 'lose_weight' | 'maintain' | 'gain_weight' | 'build_muscle'
+  conditions   String[]        @default([])
+  // When the user agreed to send their photos and health profile to the
+  // third-party AI provider (App Store 5.1.2(i)). Null = not agreed / revoked.
+  aiConsentAt  DateTime?
+  goals        NutritionGoals?
+  grocery      GroceryItem[]
+  events       UserEvent[]
+  mealLogs     MealLog[]
+  favorites    Favorite[]
+  mealPlan     MealPlanEntry[]
+  waterLogs    WaterLog[]
+  weightEntries WeightEntry[]
+  refreshTokens RefreshToken[]
+  chatMessages ChatMessage[]
+  createdAt    DateTime        @default(now())
+}
+
+// One turn of the Ask NutriChef thread. A user has a single rolling
+// conversation; ordering is by createdAt, and an edit deletes everything after
+// the edited turn so the thread stays consistent with what the model saw.
+model ChatMessage {
+  id        String   @id @default(uuid())
+  // Ordering key. createdAt cannot do this job: Postgres now() is
+  // transaction-scoped, so a question and its answer written in one
+  // transaction share a timestamp. A sequence still increments per row.
+  seq       Int      @unique @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String // 'user' | 'assistant'
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([userId, seq])
+}
+
+// Opaque 30-day refresh tokens; only the SHA-256 hash is stored. Rotated on
+// every use — the old row is revoked (revokedAt) when a new pair is issued.
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// A meal the user actually ate: nutrition snapshotted at log time so later
+// recipe edits don't rewrite history.
+model MealLog {
+  id       String   @id @default(uuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipeId String?
+  recipe   Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  name     String
+  mealType String // 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  calories Int
+  protein  Int
+  carbs    Int
+  fat      Int
+  at       DateTime @default(now())
+
+  @@index([userId, at])
+  @@index([recipeId])
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipeId  String
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, recipeId])
+  @@index([recipeId])
+}
+
+// A planned meal for a day slot. Recipe entries cascade away with the recipe;
+// custom entries (customName) carry no nutrition and count as 0 in totals.
+// Multiple entries per (user, day, slot) are allowed.
+model MealPlanEntry {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       DateTime // day granularity (UTC midnight)
+  slot       String // 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  recipeId   String?
+  recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  customName String?
+  servings   Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([recipeId])
+}
+
+// Per-100g nutrition cache per ingredient (static table + USDA FoodData
+// Central lookups land here so each ingredient is fetched at most once).
+model IngredientNutrition {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  calories  Float
+  protein   Float
+  carbs     Float
+  fat       Float
+  source    String // 'STATIC' | 'USDA' | 'NONE' (USDA has no such food; zeros, read as unknown)
+  createdAt DateTime @default(now())
+}
+
+// Packaged foods looked up by barcode on Open Food Facts, cached forever so
+// each product is fetched at most once (and scanning works when OFF is down).
+model FoodProduct {
+  barcode      String   @id
+  name         String
+  brand        String?
+  servingGrams Float?
+  calories     Float // per 100 g
+  protein      Float
+  carbs        Float
+  fat          Float
+  createdAt    DateTime @default(now())
+}
+
+// Implicit-feedback log driving recommendations: every search, recipe view,
+// grocery add and chat message becomes a weighted taste signal.
+model UserEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // 'search' | 'view' | 'grocery' | 'chat' | 'suggest'
+  recipeId  String?
+  term      String?
+  weight    Float
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  // The taste engine reads one type at a time ('suggest' penalties, 'view'
+  // history). suggest rows are written on every recommendation and outnumber
+  // real signals, so filtering type after the (userId, createdAt) range scan
+  // walks all of them.
+  @@index([userId, type, createdAt])
+  @@index([recipeId])
+  // Retention sweeps delete by age across all users.
+  @@index([createdAt])
+}
+
+model NutritionGoals {
+  id       String @id @default(uuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  calories Int    @default(980)
+  carbs    Int    @default(44)
+  protein  Int    @default(81)
+  fat      Int    @default(18)
+}
+
+// One water intake entry; multiple per day are allowed and summed for the
+// daily total. Date is day granularity (UTC midnight) like MealPlanEntry.
+model WaterLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime // day granularity (UTC midnight)
+  ml        Int
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
+}
+
+// One weigh-in per day — a second entry for the same day overwrites the
+// first (upsert on the (userId, date) unique key).
+model WeightEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime // day granularity (UTC midnight)
+  kg        Float
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+}
+
+model GroceryItem {
+  id     String  @id @default(uuid())
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+  // Denormalized so the grocery list can still group/label the item by
+  // recipe after the recipe is edited or removed (TheMealDB re-import etc).
+  recipeId   String?
+  recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  recipeName String?
+  checked    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([recipeId])
+}
+
+model Recipe {
+  id           String         @id @default(uuid())
+  externalId   String?        @unique
+  name         String
+  nameLower    String
+  category     String
+  cuisine      String
+  imageUrl     String?
+  instructions String
+  prepMinutes  Int?
+  cookMinutes  Int?
+  source       String         // 'MEALDB' | 'AI'
+  // Real per-serving nutrition, lazily computed from ingredients (USDA data).
+  calories     Int?
+  protein      Int?
+  carbs        Int?
+  fat          Int?
+  // Estimated servings the macros above are divided by (sources carry none).
+  // Null = computed before estimation existed; recomputed on next access.
+  servings     Int?
+  ingredients  Ingredient[]
+  insights     RecipeInsight?
+  searchTerms  SearchTerm[]
+  mealLogs     MealLog[]
+  favorites    Favorite[]
+  mealPlanEntries MealPlanEntry[]
+  groceryItems GroceryItem[]
+  createdAt    DateTime       @default(now())
+
+  // by-cuisine pages ORDER BY name, id — the composite serves filter and
+  // order without a sort, and its leading column still serves DISTINCT cuisine.
+  @@index([cuisine, name])
+  // nameLower is only ever queried with `contains`, which compiles to
+  // LIKE '%term%' — a btree cannot serve that, so a trigram GIN replaces it.
+  @@index([nameLower(ops: raw("gin_trgm_ops"))], map: "Recipe_nameLower_trgm_idx", type: Gin)
+}
+
+model Ingredient {
+  id       String @id @default(uuid())
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  name     String
+  measure  String
+  position Int
+
+  @@index([recipeId])
+}
+
+model RecipeInsight {
+  id        String   @id @default(uuid())
+  recipeId  String   @unique
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  content   String
+  provider  String
+  createdAt DateTime @default(now())
+}
+
+model SearchTerm {
+  id       String @id @default(uuid())
+  term     String @unique
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([recipeId])
+}

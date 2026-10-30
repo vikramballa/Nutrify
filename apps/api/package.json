@@ -1,0 +1,37 @@
+{
+  "name": "@nutrichef/api",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "dotenv -e ../../.env -- tsx watch src/server.ts",
+    "build": "prisma generate && npm run build -w @nutrichef/shared && tsc -p tsconfig.build.json",
+    "start": "dotenv -e ../../.env -- node dist/server.js",
+    "test": "vitest run",
+    "db:setup": "dotenv -e ../../.env -- sh -c 'prisma migrate deploy && tsx prisma/seed.ts'",
+    "db:import": "dotenv -e ../../.env -- tsx prisma/import.ts",
+    "db:seed:indian": "dotenv -e ../../.env -- tsx prisma/seedIndian.ts",
+    "db:seed:reviewer": "dotenv -e ../../.env -- tsx prisma/seedReviewer.ts",
+    "db:backfill-nutrition": "dotenv -e ../../.env -- tsx prisma/backfillNutrition.ts",
+    "db:backfill-images": "dotenv -e ../../.env -- tsx prisma/backfillImages.ts",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/helmet": "^13.1.0",
+    "@fastify/rate-limit": "^11.1.0",
+    "@nutrichef/shared": "*",
+    "@prisma/client": "^5.22.0",
+    "fastify": "^5.12.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "dotenv-cli": "^7.4.2",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.10"
+  }
+}

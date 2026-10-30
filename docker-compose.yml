@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nutrichef-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nutrichef
+      POSTGRES_PASSWORD: nutrichef
+      POSTGRES_DB: nutrichef
+    ports:
+      # Host port defaults to 5432; override with DB_PORT if it's already in use.
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - nutrichef-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nutrichef"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  nutrichef-pgdata:
