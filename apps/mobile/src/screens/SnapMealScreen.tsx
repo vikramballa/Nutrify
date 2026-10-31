@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -13,7 +14,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { MealType } from '@nutrichef/shared';
+import { labelAnalysisFromParsed, ocrRows, parseLabelText, type MealType } from '@nutrichef/shared';
 import type { RootStackParamList } from '../navigation/types';
 import { colors } from '../theme/colors';
 import { SCREEN_PADDING, fonts, radii, type } from '../theme/typography';
@@ -28,6 +29,7 @@ import {
   type MealPhotoAnalysisResult,
   type NutritionLabelAnalysisResult,
 } from '../hooks/useAssistant';
+import { recognizeText } from '../ocr/labelOcr';
 
 /** Long edge the photo is downscaled to before upload. */
 const MAX_EDGE = 1024;
@@ -43,6 +45,25 @@ const PORTIONS = [0.5, 1, 1.5, 2] as const;
 
 /** Whole servings eaten of a packaged item — labels print per-serving, not per-plate. */
 const LABEL_SERVINGS = [1, 2, 3] as const;
+
+/**
+ * Gram choices for a label with a per-100 g column (most Indian packs): the
+ * printed serving and two of it, 100 g, and the whole pack.
+ */
+function gramChoices(label: NutritionLabelAnalysisResult): { grams: number; label: string }[] {
+  const out: { grams: number; label: string }[] = [];
+  const add = (grams: number, text: string) => {
+    if (grams > 0 && !out.some((o) => o.grams === grams)) out.push({ grams, label: text });
+  };
+  const sg = label.servingGrams;
+  if (sg && sg !== 100) {
+    add(sg, `1 serving · ${sg} g`);
+    add(sg * 2, `2 servings · ${sg * 2} g`);
+  }
+  add(100, '100 g');
+  if (label.packGrams) add(label.packGrams, `Whole pack · ${label.packGrams} g`);
+  return out;
+}
 
 const MACROS = [
   { key: 'calories', label: 'Calories', unit: '' },
@@ -72,7 +93,7 @@ function humanError(mode: ScanMode, err: { status?: number } | null): string {
     case 422:
       return mode === 'meal'
         ? "That doesn't look like a meal. Try a clearer photo of the plate."
-        : "Couldn't find a Nutrition Facts panel. Try a closer, well-lit shot of the label.";
+        : "Couldn't find a nutrition table. Try a closer, well-lit shot of the label.";
     case 413:
       return 'That photo is too large. Try again with a closer shot.';
     case 403:
@@ -97,6 +118,12 @@ export function SnapMealScreen() {
   const [mealType, setMealType] = useState<MealType>(currentMealType());
   const [logged, setLogged] = useState(false);
   const [pickError, setPickError] = useState<string | null>(null);
+  // Label scans: the name to log it under, and grams eaten when the label
+  // prints per 100 g.
+  const [labelName, setLabelName] = useState('');
+  const [grams, setGrams] = useState(100);
+  const [customGrams, setCustomGrams] = useState('');
+  const [reading, setReading] = useState(false);
 
   const analyzeMeal = useAnalyzeMealPhoto();
   const analyzeLabel = useAnalyzeNutritionLabel();
@@ -112,6 +139,8 @@ export function SnapMealScreen() {
     setPortion(1);
     setLogged(false);
     setPickError(null);
+    setLabelName('');
+    setCustomGrams('');
     analyzeMeal.reset();
     analyzeLabel.reset();
     logMeal.reset();
@@ -123,10 +152,46 @@ export function SnapMealScreen() {
     reset();
   }
 
+  /**
+   * A label is read on the phone first (Apple Vision OCR + parseLabelText):
+   * exact, offline, and the photo never leaves the device. Only if that can't
+   * make sense of it does the photo go to the model, with the OCR text along.
+   */
+  async function readLabel(uri: string): Promise<NutritionLabelAnalysisResult | null> {
+    let ocrText: string | undefined;
+    if (recognizeText) {
+      setReading(true);
+      try {
+        const rows = ocrRows(await recognizeText(uri));
+        const parsed = parseLabelText(rows);
+        if (parsed) return { ...labelAnalysisFromParsed(parsed), provider: 'device' };
+        ocrText = rows.join('\n').slice(0, 4000) || undefined;
+      } catch {
+        // fall through to the model
+      } finally {
+        setReading(false);
+      }
+      if (!(await aiConsent.ensure())) {
+        setPickError(
+          "Couldn't read that label on your phone. Try a closer, flatter shot, or turn on AI features to read it with the assistant.",
+        );
+        return null;
+      }
+    }
+    return analyzeLabel.mutateAsync({ image: await toDataUrl(uri), ocrText });
+  }
+
+  function showLabel(label: NutritionLabelAnalysisResult) {
+    setLabelResult(label);
+    setLabelName(label.productName === 'Packaged food' ? '' : label.productName);
+    setGrams(label.servingGrams && label.servingGrams !== 100 ? label.servingGrams : 100);
+  }
+
   async function pick(source: 'camera' | 'library') {
     setPickError(null);
-    // Ask before the camera opens, not after the user has framed a shot.
-    if (!(await aiConsent.ensure())) return;
+    // Ask before the camera opens, not after the user has framed a shot. A
+    // label read on the phone needs no AI, so it asks only if it falls back.
+    if ((mode === 'meal' || !recognizeText) && !(await aiConsent.ensure())) return;
     const permission =
       source === 'camera'
         ? await ImagePicker.requestCameraPermissionsAsync()
@@ -157,11 +222,11 @@ export function SnapMealScreen() {
     setLabelResult(null);
     setLogged(false);
     try {
-      const dataUrl = await toDataUrl(uri);
       if (mode === 'meal') {
-        setMealResult(await analyzeMeal.mutateAsync(dataUrl));
+        setMealResult(await analyzeMeal.mutateAsync(await toDataUrl(uri)));
       } else {
-        setLabelResult(await analyzeLabel.mutateAsync(dataUrl));
+        const label = await readLabel(uri);
+        if (label) showLabel(label);
       }
       setPortion(1);
     } catch {
@@ -169,12 +234,16 @@ export function SnapMealScreen() {
     }
   }
 
-  const scaled = result
+  // Per-100 g labels are logged by grams eaten, everything else by portions.
+  const per100 = mode === 'label' ? labelResult?.per100g : undefined;
+  const factor = per100 ? grams / 100 : portion;
+  const base = per100 ?? result;
+  const scaled = base
     ? {
-        calories: Math.round(result.calories * portion),
-        protein: Math.round(result.protein * portion),
-        carbs: Math.round(result.carbs * portion),
-        fat: Math.round(result.fat * portion),
+        calories: Math.round(base.calories * factor),
+        protein: Math.round(base.protein * factor),
+        carbs: Math.round(base.carbs * factor),
+        fat: Math.round(base.fat * factor),
       }
     : null;
 
@@ -200,13 +269,12 @@ export function SnapMealScreen() {
       );
     } else {
       const label = result as NutritionLabelAnalysisResult;
+      const name = labelName.trim() || label.productName;
       logMeal.mutate(
         {
-          name: label.productName,
+          name,
           mealType,
-          items: [
-            { name: label.productName, measure: `${portion} × ${label.servingSize}` },
-          ],
+          items: [{ name, measure: per100 ? `${grams} g` : `${portion} × ${label.servingSize}` }],
           macros: scaled,
         },
         { onSuccess: () => setLogged(true) },
@@ -214,7 +282,7 @@ export function SnapMealScreen() {
     }
   }
 
-  const busy = analyze.isPending;
+  const busy = analyze.isPending || reading;
 
   return (
     <Screen>
@@ -228,7 +296,7 @@ export function SnapMealScreen() {
           <Text style={[type.caption, styles.subtitle]}>
             {mode === 'meal'
               ? 'Photograph your plate and the assistant estimates what is on it.'
-              : 'Photograph the Nutrition Facts panel for exact per-serving macros.'}
+              : 'Photograph the nutrition table on the pack. It is read right on your phone.'}
           </Text>
         </FadeIn>
 
@@ -261,7 +329,7 @@ export function SnapMealScreen() {
           <PopIn>
             <View style={styles.photoWrap}>
               <Image source={{ uri: photo }} style={styles.photo} />
-              {busy && <ScanOverlay />}
+              {busy && <ScanOverlay text={mode === 'meal' ? 'Reading your plate…' : 'Reading the label…'} />}
               {!busy && (
                 <PressableScale
                   onPress={reset}
@@ -312,23 +380,39 @@ export function SnapMealScreen() {
               <Card style={styles.resultCard}>
                 <View style={styles.resultHeader}>
                   <View style={styles.flex1}>
-                    <Text style={type.sectionHeader}>
-                      {mode === 'meal'
-                        ? (result as MealPhotoAnalysisResult).name
-                        : (result as NutritionLabelAnalysisResult).productName}
-                    </Text>
+                    {mode === 'meal' ? (
+                      <Text style={type.sectionHeader}>{(result as MealPhotoAnalysisResult).name}</Text>
+                    ) : (
+                      <TextInput
+                        value={labelName}
+                        onChangeText={setLabelName}
+                        placeholder="Name this food (e.g. Marie biscuits)"
+                        placeholderTextColor={colors.textTertiary}
+                        maxLength={80}
+                        style={[type.sectionHeader, styles.nameInput]}
+                        accessibilityLabel="Food name"
+                      />
+                    )}
                     <Text style={[type.caption, styles.captionTop]}>
                       {mode === 'meal'
                         ? `Estimated for ${portion === 1 ? 'the plate shown' : `${portion}× the plate`}`
-                        : `${(result as NutritionLabelAnalysisResult).servingSize} · ${portion} serving${portion === 1 ? '' : 's'}`}
+                        : per100
+                          ? `${grams} g · printed per 100 g`
+                          : `${(result as NutritionLabelAnalysisResult).servingSize} · ${portion} serving${portion === 1 ? '' : 's'}`}
                     </Text>
                   </View>
                   {mode === 'meal' ? (
                     <ConfidencePill value={(result as MealPhotoAnalysisResult).confidence} />
                   ) : (
                     <View style={[styles.pill, styles.pillHigh]}>
-                      <Ionicons name="checkmark-done" size={12} color={colors.success} />
-                      <Text style={[styles.pillText, { color: colors.success }]}>From label</Text>
+                      <Ionicons
+                        name={labelResult?.source === 'device' ? 'phone-portrait-outline' : 'checkmark-done'}
+                        size={12}
+                        color={colors.success}
+                      />
+                      <Text style={[styles.pillText, { color: colors.success }]}>
+                        {labelResult?.source === 'device' ? 'Read on phone' : 'From label'}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -363,7 +447,39 @@ export function SnapMealScreen() {
             <FadeIn delay={110}>
               <Text style={[type.eyebrow, styles.eyebrow]}>HOW MUCH DID YOU EAT</Text>
               <View style={styles.chipRow}>
-                {mode === 'meal'
+                {per100 && labelResult
+                  ? (
+                    <>
+                      {gramChoices(labelResult).map((c) => (
+                        <Chip
+                          key={c.grams}
+                          label={c.label}
+                          active={c.grams === grams && !customGrams}
+                          onPress={() => {
+                            setGrams(c.grams);
+                            setCustomGrams('');
+                          }}
+                        />
+                      ))}
+                      <View style={[styles.chip, styles.gramInputWrap, customGrams ? styles.chipActive : null]}>
+                        <TextInput
+                          value={customGrams}
+                          onChangeText={(t) => {
+                            const clean = t.replace(/[^0-9]/g, '').slice(0, 4);
+                            setCustomGrams(clean);
+                            if (Number(clean) > 0) setGrams(Number(clean));
+                          }}
+                          placeholder="Other"
+                          placeholderTextColor={colors.textTertiary}
+                          keyboardType="number-pad"
+                          style={[styles.chipText, styles.gramInput, customGrams ? styles.chipTextActive : null]}
+                          accessibilityLabel="Grams eaten"
+                        />
+                        <Text style={[styles.chipText, customGrams ? styles.chipTextActive : null]}>g</Text>
+                      </View>
+                    </>
+                  )
+                  : mode === 'meal'
                   ? PORTIONS.map((p) => (
                       <Chip
                         key={p}
@@ -404,15 +520,27 @@ export function SnapMealScreen() {
                   {(result as MealPhotoAnalysisResult).items.map((item, i, items) => (
                     <FadeIn key={`${item.name}-${i}`} index={i} offset={8}>
                       <View style={[styles.itemRow, i < items.length - 1 && styles.itemRowDivider]}>
-                        <View style={styles.itemDot} />
+                        <View style={[styles.itemDot, item.matched === false && styles.itemDotEstimate]} />
                         <Text style={[type.body, styles.flex1]} numberOfLines={1}>
+                          {item.count ? `${Math.round(item.count * portion * 10) / 10} × ` : ''}
                           {item.name}
                         </Text>
-                        <Text style={type.caption}>{Math.round(item.grams * portion)} g</Text>
+                        <Text style={type.caption}>
+                          {Math.round(item.grams * portion)} g
+                          {item.calories != null ? ` · ${Math.round(item.calories * portion)} cal` : ''}
+                        </Text>
                       </View>
                     </FadeIn>
                   ))}
                 </Card>
+                {(result as MealPhotoAnalysisResult).items.some((i) => i.matched === false) && (
+                  <View style={styles.legendRow}>
+                    <View style={[styles.itemDot, styles.itemDotEstimate]} />
+                    <Text style={[type.caption, styles.flex1]}>
+                      The assistant's estimate. Everything else is from our Indian and USDA food tables.
+                    </Text>
+                  </View>
+                )}
               </FadeIn>
             )}
 
@@ -499,14 +627,14 @@ function EmptyDropZone({ mode }: { mode: ScanMode }) {
       <Text style={[type.caption, styles.dropZoneBody]}>
         {mode === 'meal'
           ? 'Works best with the whole meal in frame, shot from above.'
-          : 'Fill the frame with the Nutrition Facts panel, flat and well lit.'}
+          : 'Fill the frame with the nutrition table, flat and well lit.'}
       </Text>
     </View>
   );
 }
 
-/** A scan line sweeping the photo while the model reads it. */
-function ScanOverlay() {
+/** A scan line sweeping the photo while it is read. */
+function ScanOverlay({ text }: { text: string }) {
   const sweep = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -540,7 +668,7 @@ function ScanOverlay() {
       />
       <View style={styles.scanLabel}>
         <ActivityIndicator size="small" color="#fff" />
-        <Text style={styles.scanLabelText}>Reading your plate…</Text>
+        <Text style={styles.scanLabelText}>{text}</Text>
       </View>
     </View>
   );
@@ -800,6 +928,11 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     backgroundColor: colors.primary,
   },
+  itemDotEstimate: { backgroundColor: colors.textTertiary },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, paddingHorizontal: 4 },
+  nameInput: { paddingVertical: 0 },
+  gramInputWrap: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingVertical: 6 },
+  gramInput: { minWidth: 44, paddingVertical: 2, textAlign: 'right' },
 
   saveButton: {
     height: 54,

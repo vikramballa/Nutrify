@@ -15,6 +15,8 @@ export interface SeedRecipe {
   cuisine: string; // 'Indian' (or a regional label)
   prepMinutes: number;
   cookMinutes: number;
+  /** People the quantities feed — stored as Recipe.declaredServings. */
+  servings: number;
   instructions: string;
   ingredients: { name: string; measure: string }[];
 }
@@ -27,6 +29,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 20,
     cookMinutes: 20,
+    servings: 10,
     instructions:
       'Soak the rice and urad dal separately for at least 6 hours, then grind to a smooth batter, mix, and ferment overnight until light and bubbly.\n\nFor the potato masala, heat oil and crackle mustard seeds, then add curry leaves, onion, green chilli and ginger; sauté for 3 minutes.\n\nAdd turmeric and the boiled, mashed potatoes with a little water. Cook for 5 minutes and finish with coriander.\n\nHeat a flat tawa, pour a ladle of batter and spread thin in a spiral. Drizzle oil around the edges and cook for 2 minutes until golden and crisp.\n\nPlace a spoon of potato masala in the centre, fold over, and serve hot with coconut chutney and sambar.',
     ingredients: [
@@ -49,6 +52,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 15,
     cookMinutes: 15,
+    servings: 7,
     instructions:
       'Soak the idli rice and urad dal separately for 6 hours. Grind to a smooth, fluffy batter, add salt, and ferment overnight.\n\nGrease the idli moulds lightly with oil and pour in the batter until three-quarters full.\n\nSteam in an idli steamer for 12 minutes until a toothpick comes out clean.\n\nRest for 3 minutes, then demould with a wet spoon. Serve hot with coconut chutney and sambar.',
     ingredients: [
@@ -65,6 +69,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 20,
     cookMinutes: 20,
+    servings: 6,
     instructions:
       'Soak the urad dal for 4 hours, then grind to a thick, fluffy batter using minimal water. Whip well so it turns light.\n\nMix in chopped onion, green chilli, ginger, curry leaves, black pepper and salt.\n\nHeat oil for deep frying. Wet your hand, shape a portion into a doughnut with a hole in the centre, and slide into the oil.\n\nFry in batches for 4 minutes, turning, until deep golden and crisp. Drain on paper and serve hot with chutney.',
     ingredients: [
@@ -84,6 +89,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Maharashtrian',
     prepMinutes: 10,
     cookMinutes: 10,
+    servings: 3,
     instructions:
       'Rinse the flattened rice in a colander until just softened, then drain and set aside for 5 minutes; sprinkle with sugar and salt.\n\nHeat oil and crackle mustard seeds; add peanuts and fry until crisp.\n\nAdd curry leaves, green chilli and onion, and sauté for 3 minutes until soft.\n\nStir in turmeric, then fold in the softened poha gently. Cover and steam for 2 minutes.\n\nFinish with lemon juice, fresh coriander and grated coconut. Serve warm.',
     ingredients: [
@@ -106,6 +112,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 10,
     cookMinutes: 15,
+    servings: 3,
     instructions:
       'Dry-roast the semolina over medium heat for 4 minutes until aromatic, then set aside.\n\nHeat ghee and crackle mustard seeds and cumin; add urad dal, curry leaves, green chilli, ginger and onion. Sauté for 3 minutes.\n\nPour in hot water with salt and bring to a boil.\n\nLower the heat and rain in the roasted semolina while stirring to avoid lumps. Cover and cook for 3 minutes.\n\nFluff with a fork, add lemon juice and coriander, and serve hot.',
     ingredients: [
@@ -128,6 +135,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Punjabi',
     prepMinutes: 20,
     cookMinutes: 20,
+    servings: 3,
     instructions:
       'Knead the wheat flour with water and a little oil into a soft dough and rest for 20 minutes.\n\nMash the boiled potatoes with green chilli, ginger, coriander, garam masala, red chilli powder and salt.\n\nRoll a ball of dough, place a portion of filling in the centre, seal, and gently roll out into a paratha.\n\nCook on a hot tawa, smearing ghee on both sides, for 2 minutes per side until golden brown spots appear.\n\nServe hot with butter, yogurt and pickle.',
     ingredients: [
@@ -148,6 +156,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Punjabi',
     prepMinutes: 30,
     cookMinutes: 40,
+    servings: 4,
     instructions:
       'Soak the chickpeas overnight, then pressure-cook with salt and a tea bag for 20 minutes until soft; discard the tea bag.\n\nFor the masala, sauté onion, ginger-garlic paste and tomato until the oil separates, then add chole masala, cumin, coriander powder and chilli powder.\n\nAdd the cooked chickpeas with their water and simmer for 15 minutes until thick and dark. Finish with garam masala.\n\nFor the bhature, knead flour with yogurt, a pinch of baking soda and water into a soft dough; rest for 2 hours.\n\nRoll into ovals and deep-fry for 1 minute each until puffed and golden. Serve the chole hot with bhature and onions.',
     ingredients: [
@@ -171,6 +180,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 20,
     cookMinutes: 20,
+    servings: 4,
     instructions:
       'Whisk the semolina, rice flour and plain flour with water into a thin, pourable batter and rest for 20 minutes.\n\nStir in cumin, black pepper, green chilli, ginger, curry leaves and coriander; adjust to a buttermilk consistency.\n\nHeat a tawa well. Unlike regular dosa, pour the batter from a height across the pan to form a lacy net; do not spread with the ladle.\n\nDrizzle oil around the edges and cook for 3 minutes until crisp and golden, then fold. Serve with coconut chutney.',
     ingredients: [
@@ -192,6 +202,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 10,
     cookMinutes: 15,
+    servings: 3,
     instructions:
       'Whisk the gram flour with water into a smooth, lump-free batter of pouring consistency.\n\nStir in turmeric, red chilli powder, ajwain, salt, chopped onion, tomato, green chilli and coriander.\n\nHeat a non-stick tawa and pour a ladle of batter, spreading into a round pancake.\n\nDrizzle oil around the edges and cook for 2 minutes per side until golden. Serve hot with green chutney.',
     ingredients: [
@@ -213,6 +224,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Maharashtrian',
     prepMinutes: 15,
     cookMinutes: 10,
+    servings: 3,
     instructions:
       'Rinse the sago pearls and soak in just enough water to cover for 4 hours until fluffy and separate.\n\nMix the drained sago with crushed roasted peanuts, salt and a little sugar.\n\nHeat ghee and crackle cumin; add green chilli and curry leaves, then the cubed boiled potato and fry for 3 minutes.\n\nFold in the sago and cook gently for 4 minutes until translucent, stirring so it does not clump.\n\nFinish with lemon juice and coriander and serve hot.',
     ingredients: [
@@ -233,6 +245,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 10,
     cookMinutes: 20,
+    servings: 4,
     instructions:
       'Use thick, fermented dosa batter seasoned with salt.\n\nHeat a tawa and pour a ladle of batter, spreading into a thick round; do not make it too thin.\n\nScatter chopped onion, tomato, green chilli and coriander over the top and press in gently.\n\nDrizzle oil around the edges and cook for 3 minutes until the base is golden, then flip and cook for 2 more minutes. Serve with chutney.',
     ingredients: [
@@ -250,11 +263,13 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Punjabi',
     prepMinutes: 20,
     cookMinutes: 15,
+    servings: 3,
     instructions:
       'Knead the wheat flour with water into a soft dough and rest for 20 minutes.\n\nGrate the paneer and mix with green chilli, ginger, garam masala, red chilli powder, coriander and salt.\n\nRoll a ball of dough, stuff with the paneer filling, seal, and roll gently into a paratha.\n\nCook on a hot tawa with ghee for 2 minutes per side until golden. Serve with yogurt and pickle.',
     ingredients: [
       { name: 'Wheat flour', measure: '2 cups' },
       { name: 'Paneer', measure: '200 g' },
+      { name: 'Water', measure: '3/4 cup' },
       { name: 'Green chilli', measure: '2' },
       { name: 'Ginger', measure: '1 tsp' },
       { name: 'Garam masala', measure: '1 tsp' },
@@ -271,10 +286,12 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Punjabi',
     prepMinutes: 15,
     cookMinutes: 40,
+    servings: 4,
     instructions:
       'Soak the kidney beans overnight, then pressure-cook with salt for 20 minutes until very soft.\n\nHeat oil and cumin; add onion and cook until golden, then add ginger-garlic paste and cook for 2 minutes.\n\nAdd tomato puree, turmeric, coriander powder, red chilli powder and cook until the oil separates.\n\nStir in the cooked beans with their liquid and simmer for 15 minutes, mashing a few beans to thicken.\n\nFinish with garam masala and coriander. Serve hot with steamed rice.',
     ingredients: [
       { name: 'Kidney beans (rajma)', measure: '1.5 cups' },
+      { name: 'Water', measure: '3 cups' },
       { name: 'Onion', measure: '2' },
       { name: 'Tomato', measure: '3, pureed' },
       { name: 'Ginger garlic paste', measure: '1 tbsp' },
@@ -292,6 +309,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Punjabi',
     prepMinutes: 20,
     cookMinutes: 40,
+    servings: 4,
     instructions:
       'Whisk the yogurt with gram flour, turmeric, salt and water until completely smooth with no lumps.\n\nFor the pakoras, mix gram flour with onion, chilli and water into a thick batter and deep-fry spoonfuls for 3 minutes until golden; set aside.\n\nBring the kadhi to a boil, then simmer on low for 25 minutes, stirring often, until it thickens and loses its raw smell.\n\nPrepare a tempering of ghee, cumin, dried red chilli and asafoetida and pour over the kadhi.\n\nDrop in the pakoras and simmer for 5 minutes. Serve hot with rice.',
     ingredients: [
@@ -312,6 +330,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Maharashtrian',
     prepMinutes: 20,
     cookMinutes: 30,
+    servings: 4,
     instructions:
       'Pressure-cook the potato, cauliflower, peas and carrot until soft, then mash coarsely.\n\nHeat butter and sauté onion until soft, then add ginger-garlic paste and tomato and cook until pulpy.\n\nAdd pav bhaji masala, red chilli powder and turmeric, then the mashed vegetables with a little water.\n\nSimmer for 15 minutes, mashing continuously, until thick and rich; finish with more butter and coriander.\n\nToast the pav buns with butter on the tawa. Serve the bhaji hot with pav, chopped onion and lemon.',
     ingredients: [
@@ -324,7 +343,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
       { name: 'Ginger garlic paste', measure: '1 tbsp' },
       { name: 'Pav bhaji masala', measure: '2 tbsp' },
       { name: 'Butter', measure: '4 tbsp' },
-      { name: 'Pav buns', measure: '8' },
+      { name: 'Pav', measure: '8' },
     ],
   },
   {
@@ -333,6 +352,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 10,
     cookMinutes: 10,
+    servings: 3,
     instructions:
       'Use cooled, cooked rice with separate grains.\n\nHeat oil and crackle mustard seeds; add urad dal, chana dal and peanuts and fry until golden.\n\nAdd curry leaves, green chilli, ginger and turmeric, and sauté for 1 minute.\n\nTurn off the heat and stir in lemon juice, then gently fold in the rice with salt until evenly coated. Serve warm.',
     ingredients: [
@@ -354,6 +374,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 10,
     cookMinutes: 5,
+    servings: 3,
     instructions:
       'Mash the warm cooked rice lightly, then let it cool to room temperature.\n\nMix in fresh yogurt, a little milk and salt until creamy and soft.\n\nPrepare a tempering of oil, mustard seeds, urad dal, curry leaves, green chilli and ginger.\n\nPour the tempering over the rice and fold through with coriander and grated carrot. Serve chilled.',
     ingredients: [
@@ -375,11 +396,13 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 15,
     cookMinutes: 30,
+    servings: 6,
     instructions:
       'Pressure-cook the toor dal with turmeric until soft, then mash smooth.\n\nBoil the mixed vegetables with tamarind extract, salt and sambar powder for 10 minutes until tender.\n\nAdd the mashed dal and simmer for 10 minutes, loosening with water to a pourable consistency.\n\nPrepare a tempering of ghee, mustard seeds, dried red chilli, curry leaves and asafoetida and pour over.\n\nFinish with coriander and serve hot with rice or idli.',
     ingredients: [
       { name: 'Toor dal', measure: '1 cup' },
       { name: 'Mixed vegetables', measure: '2 cups' },
+      { name: 'Water', measure: '4 cups' },
       { name: 'Tamarind', measure: '1 tbsp' },
       { name: 'Sambar powder', measure: '2 tbsp' },
       { name: 'Turmeric', measure: '1/2 tsp' },
@@ -396,11 +419,13 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 10,
     cookMinutes: 20,
+    servings: 4,
     instructions:
       'Extract tamarind pulp in water and add crushed tomato, rasam powder, turmeric and salt; boil for 8 minutes.\n\nStir in a little cooked, mashed toor dal and thin with water; heat until frothy but do not boil hard.\n\nCrush garlic, cumin and black pepper and add for aroma.\n\nTemper ghee with mustard seeds, dried red chilli and curry leaves and pour over. Finish with coriander and serve hot.',
     ingredients: [
       { name: 'Tamarind', measure: '1 tbsp' },
       { name: 'Tomato', measure: '2' },
+      { name: 'Water', measure: '4 cups' },
       { name: 'Toor dal', measure: '1/4 cup cooked' },
       { name: 'Rasam powder', measure: '2 tbsp' },
       { name: 'Garlic', measure: '4 cloves' },
@@ -417,6 +442,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 15,
     cookMinutes: 25,
+    servings: 5,
     instructions:
       'Rinse and soak the basmati rice for 20 minutes, then drain.\n\nHeat ghee and fry the whole spices — bay leaf, cardamom, cloves and cinnamon — until fragrant.\n\nAdd onion and cook until golden, then add ginger-garlic paste and the mixed vegetables and sauté for 4 minutes.\n\nStir in the drained rice, salt and water in a 1:2 ratio, and bring to a boil.\n\nCover and cook on low for 12 minutes, then rest for 5 minutes off the heat. Fluff and serve.',
     ingredients: [
@@ -438,6 +464,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 15,
     cookMinutes: 25,
+    servings: 4,
     instructions:
       'Lightly pan-fry the paneer cubes until golden and set aside.\n\nBlend onion, tomato, ginger and garlic into a smooth paste and cook in oil until the oil separates, about 8 minutes.\n\nAdd turmeric, coriander powder, red chilli powder and garam masala and cook for 2 minutes.\n\nAdd the green peas with a cup of water and simmer for 8 minutes, then add the paneer and cream.\n\nSimmer for 5 minutes and finish with coriander. Serve hot with roti.',
     ingredients: [
@@ -460,6 +487,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 15,
     cookMinutes: 20,
+    servings: 3,
     instructions:
       'Wash and thoroughly dry the okra, then slice into pieces; moisture makes it slimy.\n\nShallow-fry the okra in oil for 6 minutes until the stickiness disappears, then set aside.\n\nIn the same pan sauté onion until golden, add ginger-garlic paste, then tomato, turmeric, coriander powder and red chilli powder; cook until the oil separates.\n\nReturn the okra and toss for 4 minutes until coated and tender. Finish with garam masala and amchur, and serve with roti.',
     ingredients: [
@@ -483,6 +511,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Hyderabadi',
     prepMinutes: 40,
     cookMinutes: 45,
+    servings: 6,
     instructions:
       'Marinate the chicken in yogurt, ginger-garlic paste, red chilli powder, biryani masala, fried onions, mint and salt for at least 60 minutes.\n\nSoak the basmati rice for 30 minutes, then parboil in salted water with whole spices until 70% cooked and drain.\n\nLayer the marinated chicken at the base of a heavy pot, then spread the rice over it. Top with saffron milk, fried onions, mint and ghee.\n\nSeal the lid with dough or foil and cook on high for 3 minutes, then on the lowest heat (dum) for 25 minutes.\n\nRest for 10 minutes, then gently fluff from the sides. Serve with raita.',
     ingredients: [
@@ -504,11 +533,13 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Punjabi',
     prepMinutes: 20,
     cookMinutes: 60,
+    servings: 5,
     instructions:
       'Soak the whole black urad dal and kidney beans overnight, then pressure-cook with salt for 30 minutes until very soft.\n\nHeat butter and cumin; add ginger-garlic paste and cook, then add tomato puree, red chilli powder and cook until thick.\n\nAdd the cooked dal with its liquid and simmer on the lowest heat for 30 minutes, stirring often so it does not stick.\n\nStir in cream and a knob of butter and simmer for 10 more minutes until glossy and rich.\n\nFinish with garam masala and serve hot with naan.',
     ingredients: [
       { name: 'Black urad dal', measure: '1 cup' },
       { name: 'Kidney beans (rajma)', measure: '1/4 cup' },
+      { name: 'Water', measure: '4 cups' },
       { name: 'Tomato', measure: '3, pureed' },
       { name: 'Ginger garlic paste', measure: '1 tbsp' },
       { name: 'Cumin seeds', measure: '1 tsp' },
@@ -524,6 +555,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Kashmiri',
     prepMinutes: 20,
     cookMinutes: 75,
+    servings: 4,
     instructions:
       'Heat oil and mustard oil with whole spices — cloves, cardamom, cinnamon and bay leaf — until fragrant.\n\nBrown the mutton pieces on all sides over high heat for 8 minutes.\n\nAdd yogurt whisked with Kashmiri chilli powder, fennel powder and ginger powder, and cook until the oil separates.\n\nPour in warm water, cover, and simmer on low for 60 minutes until the mutton is fork-tender and the gravy is deep red.\n\nFinish with garam masala and serve hot with rice.',
     ingredients: [
@@ -545,6 +577,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 25,
     cookMinutes: 35,
+    servings: 4,
     instructions:
       'Dry-roast the coriander seeds, cumin, fennel, black pepper, dried red chilli and coconut for 3 minutes, then grind to the Chettinad masala.\n\nHeat oil and fry curry leaves, then onion until golden; add ginger-garlic paste and tomato and cook down.\n\nAdd the chicken and sear for 5 minutes, then stir in turmeric and the ground masala.\n\nPour in a little water, cover, and simmer for 20 minutes until the chicken is tender and coated in thick, dark masala.\n\nFinish with coriander and serve with rice or dosa.',
     ingredients: [
@@ -567,6 +600,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 15,
     cookMinutes: 30,
+    servings: 4,
     instructions:
       'Simmer onion, tomato, cashews, ginger and garlic in water for 12 minutes, then blend to a silky smooth puree.\n\nHeat butter and cook the puree with red chilli powder for 8 minutes until thick and the raw smell is gone.\n\nStir in a little water, sugar and dried fenugreek leaves, and simmer for 5 minutes.\n\nAdd the paneer cubes and cream and simmer gently for 5 minutes.\n\nFinish with garam masala and a swirl of cream. Serve hot with naan.',
     ingredients: [
@@ -588,6 +622,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 15,
     cookMinutes: 20,
+    servings: 4,
     instructions:
       'Dry-roast coriander seeds and dried red chilli for 2 minutes and crush coarsely into kadai masala.\n\nHeat oil and sauté onion and capsicum chunks on high for 3 minutes, then set aside.\n\nIn the same pan add ginger-garlic paste and tomato and cook until pulpy, then add the crushed masala and turmeric.\n\nReturn the onion and capsicum, add the paneer, and toss for 5 minutes.\n\nFinish with kasuri methi and garam masala and serve hot.',
     ingredients: [
@@ -609,6 +644,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 30,
     cookMinutes: 30,
+    servings: 4,
     instructions:
       'Mash the boiled potato with grated paneer, cornflour, salt and a little cardamom; shape into balls stuffed with raisins and nuts.\n\nDeep-fry the koftas for 3 minutes until golden, then drain and set aside.\n\nFor the gravy, blend onion, tomato, cashews, ginger and garlic and cook in butter for 10 minutes until thick.\n\nAdd chilli powder, garam masala, a little sugar and cream, and simmer for 5 minutes.\n\nPlace the koftas in a serving dish and pour the hot gravy over just before serving so they stay soft.',
     ingredients: [
@@ -630,6 +666,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Goan',
     prepMinutes: 20,
     cookMinutes: 25,
+    servings: 4,
     instructions:
       'Grind coconut, dried red chilli, coriander seeds, cumin, turmeric, garlic and tamarind with water into a smooth red masala.\n\nHeat oil and sauté onion until soft, then add the ground masala and cook for 5 minutes.\n\nPour in water to make a thin gravy and bring to a gentle simmer.\n\nSlide in the fish pieces and simmer for 10 minutes without stirring hard, so they stay whole.\n\nSeason with salt and serve hot with steamed rice.',
     ingredients: [
@@ -651,6 +688,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 15,
     cookMinutes: 20,
+    servings: 3,
     instructions:
       'Clean and devein the prawns and marinate with turmeric, chilli powder and salt for 10 minutes.\n\nHeat oil and fry curry leaves, then onion until golden; add ginger-garlic paste and cook for 2 minutes.\n\nAdd tomato, coriander powder and garam masala and cook until the oil separates.\n\nAdd the prawns and cook for 6 minutes until pink and just firm; do not overcook.\n\nFinish with coriander and serve hot with rice.',
     ingredients: [
@@ -672,6 +710,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 10,
     cookMinutes: 25,
+    servings: 3,
     instructions:
       'Boil the eggs for 10 minutes, then peel and lightly prick; shallow-fry with turmeric and chilli powder for 2 minutes.\n\nIn the same pan sauté onion until golden, add ginger-garlic paste, then tomato and cook until pulpy.\n\nAdd turmeric, coriander powder, red chilli powder and garam masala and cook until the oil separates.\n\nPour in water for a medium gravy and simmer for 8 minutes, then add the eggs and simmer for 5 minutes.\n\nFinish with coriander and serve with rice or roti.',
     ingredients: [
@@ -692,6 +731,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 20,
     cookMinutes: 70,
+    servings: 4,
     instructions:
       'Heat oil with bay leaf, cardamom and cloves, then add onion and cook until deep golden.\n\nAdd ginger-garlic paste and the mutton and brown on high for 8 minutes.\n\nStir in yogurt, turmeric, coriander powder, red chilli powder and garam masala and cook until the oil separates.\n\nAdd warm water, cover, and simmer on low for 55 minutes until the mutton is tender and the gravy thickens.\n\nFinish with coriander and serve hot with rice.',
     ingredients: [
@@ -713,6 +753,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 15,
     cookMinutes: 25,
+    servings: 3,
     instructions:
       'Roast the whole aubergine over an open flame for 10 minutes until the skin chars and the flesh is soft; cool, peel and mash.\n\nHeat oil and cumin, then sauté onion until golden and add ginger-garlic paste.\n\nAdd tomato, turmeric, coriander powder and red chilli powder and cook until the oil separates.\n\nFold in the mashed aubergine and cook for 8 minutes, stirring, until well blended.\n\nFinish with garam masala, peas and coriander. Serve with roti.',
     ingredients: [
@@ -734,6 +775,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Kashmiri',
     prepMinutes: 15,
     cookMinutes: 30,
+    servings: 4,
     instructions:
       'Prick the baby potatoes and deep-fry for 5 minutes until golden, then set aside.\n\nWhisk yogurt with Kashmiri chilli powder, fennel powder and ginger powder into a smooth paste.\n\nHeat oil with whole spices, add the yogurt mixture and cook gently so it does not split, for 5 minutes.\n\nAdd the fried potatoes with a little water, cover, and cook on dum (low heat) for 15 minutes until the gravy clings.\n\nFinish with garam masala and serve hot.',
     ingredients: [
@@ -754,6 +796,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Punjabi',
     prepMinutes: 30,
     cookMinutes: 30,
+    servings: 4,
     instructions:
       'Make deep slashes in the chicken and rub with lemon juice, salt and red chilli powder; rest for 15 minutes.\n\nWhisk yogurt with ginger-garlic paste, tandoori masala, garam masala and a little oil, and coat the chicken thoroughly. Marinate for at least 60 minutes.\n\nArrange on a rack and roast in a hot oven at 220C for 25 minutes, turning once, until charred at the edges and cooked through.\n\nBrush with butter and roast for 3 more minutes. Serve hot with onion rings, mint chutney and lemon.',
     ingredients: [
@@ -775,6 +818,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 10,
     cookMinutes: 0,
+    servings: 4,
     instructions:
       'Whisk the yogurt until smooth and creamy.\n\nGrate or finely chop the cucumber and squeeze out excess water, then fold into the yogurt.\n\nSeason with roasted cumin powder, black salt, red chilli powder and chopped coriander.\n\nChill for 10 minutes and serve alongside biryani or paratha.',
     ingredients: [
@@ -792,6 +836,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 10,
     cookMinutes: 0,
+    servings: 4,
     instructions:
       'Whisk the yogurt with a little water into a smooth pouring consistency.\n\nSoak the boondi in warm water for 3 minutes, then gently squeeze and add to the yogurt.\n\nSeason with roasted cumin powder, black salt, red chilli powder and coriander.\n\nRest for 5 minutes so the boondi softens, and serve chilled.',
     ingredients: [
@@ -809,6 +854,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 10,
     cookMinutes: 20,
+    servings: 5,
     instructions:
       'Rinse and soak the basmati rice for 20 minutes, then drain.\n\nHeat ghee and crackle cumin seeds with a bay leaf until fragrant.\n\nAdd the drained rice and sauté gently for 2 minutes to coat the grains.\n\nPour in water in a 1:2 ratio with salt, bring to a boil, then cover and cook on low for 12 minutes.\n\nRest for 5 minutes, fluff with a fork, and serve.',
     ingredients: [
@@ -826,6 +872,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 20,
     cookMinutes: 15,
+    servings: 6,
     instructions:
       'Knead the flour with yogurt, milk, sugar, baking powder and salt into a soft dough; cover and rest for 2 hours.\n\nDivide into balls and roll each into an oval, slightly thick.\n\nHeat a tawa until very hot; cook the naan for 1 minute until bubbles form, then flip and cook the other side.\n\nBrush generously with melted butter and coriander, and serve hot.',
     ingredients: [
@@ -844,6 +891,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 15,
     cookMinutes: 15,
+    servings: 6,
     instructions:
       'Knead the wheat flour with water and salt into a firm, smooth dough and rest for 15 minutes.\n\nDivide into balls and roll each into a thick round.\n\nCook on a very hot tawa for 1 minute, then hold directly over the flame with tongs until it puffs and chars in spots.\n\nBrush with ghee and serve hot.',
     ingredients: [
@@ -859,10 +907,12 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 10,
     cookMinutes: 5,
+    servings: 6,
     instructions:
       'Grind fresh coconut with roasted chana dal, green chilli, ginger and salt, adding water to a smooth paste.\n\nTransfer to a bowl and loosen with a little more water to a dropping consistency.\n\nPrepare a tempering of oil, mustard seeds, urad dal, dried red chilli and curry leaves.\n\nPour the tempering over the chutney and serve with dosa or idli.',
     ingredients: [
       { name: 'Coconut', measure: '1 cup' },
+      { name: 'Water', measure: '1/2 cup' },
       { name: 'Chana dal', measure: '2 tbsp' },
       { name: 'Green chilli', measure: '2' },
       { name: 'Ginger', measure: '1 tsp' },
@@ -879,6 +929,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 10,
     cookMinutes: 0,
+    servings: 6,
     instructions:
       'Wash the mint and coriander leaves thoroughly.\n\nBlend with green chilli, ginger, garlic, roasted cumin and salt into a smooth paste.\n\nAdd lemon juice and a little water and blend again to a bright green, spoonable chutney.\n\nChill and serve with tandoori dishes, chaat or as a sandwich spread.',
     ingredients: [
@@ -897,6 +948,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 10,
     cookMinutes: 0,
+    servings: 3,
     instructions:
       'Finely dice the cucumber, tomato and onion into even pieces.\n\nToss with chopped green chilli and coriander.\n\nDress with lemon juice, roasted cumin powder, salt and a pinch of chaat masala just before serving so it stays crunchy.',
     ingredients: [
@@ -915,6 +967,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 10,
     cookMinutes: 15,
+    servings: 4,
     instructions:
       'Boil the potatoes until just tender, then peel and cube.\n\nHeat oil and crackle plenty of cumin seeds until fragrant.\n\nAdd turmeric, green chilli and the potatoes, and toss to coat.\n\nCook for 6 minutes, turning occasionally, until the edges turn golden and slightly crisp.\n\nFinish with amchur, red chilli powder and coriander. Serve hot.',
     ingredients: [
@@ -934,6 +987,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 10,
     cookMinutes: 15,
+    servings: 4,
     instructions:
       'Thinly slice the onions and mix with gram flour, rice flour, ajwain, red chilli powder, turmeric and salt.\n\nDo not add water at first; let the onions release moisture, then add a splash only if needed to bind.\n\nHeat oil for deep frying. Drop small clusters of the mixture into the oil.\n\nFry for 4 minutes, turning, until deep golden and crisp. Drain and serve hot with chutney and chai.',
     ingredients: [
@@ -954,6 +1008,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 5,
     cookMinutes: 10,
+    servings: 2,
     instructions:
       'Crush the ginger, cardamom, cloves and black pepper coarsely.\n\nBring water to a boil with the crushed spices and cinnamon, and simmer for 3 minutes to release the aroma.\n\nAdd the black tea leaves and sugar and boil for 2 minutes.\n\nPour in the milk and simmer for 3 minutes, letting it rise once or twice for a strong brew.\n\nStrain into cups and serve piping hot.',
     ingredients: [
@@ -973,6 +1028,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 5,
     cookMinutes: 0,
+    servings: 3,
     instructions:
       'Peel and chop the ripe mango, or use thick mango pulp.\n\nBlend the mango with chilled yogurt, milk, sugar and a pinch of cardamom until smooth and frothy.\n\nAdjust the sweetness and thickness with more milk if needed.\n\nPour into glasses over ice and garnish with a few saffron strands or chopped pistachios.',
     ingredients: [
@@ -989,6 +1045,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Punjabi',
     prepMinutes: 5,
     cookMinutes: 0,
+    servings: 2,
     instructions:
       'Whisk or blend the chilled yogurt with cold water until light and frothy.\n\nAdd sugar and a pinch of cardamom and blend again until the sugar dissolves.\n\nPour into tall glasses over ice.\n\nTop with a spoon of malai (cream) and serve cold.',
     ingredients: [
@@ -1005,6 +1062,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 5,
     cookMinutes: 0,
+    servings: 4,
     instructions:
       'Squeeze the lemons into a jug and add cold water.\n\nStir in sugar, black salt, roasted cumin powder and a pinch of regular salt until dissolved.\n\nAdd a few mint leaves and crush lightly to release the flavour.\n\nPour over ice and serve chilled.',
     ingredients: [
@@ -1022,6 +1080,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 10,
     cookMinutes: 20,
+    servings: 4,
     instructions:
       'Boil or pressure-cook the raw mangoes until soft, for about 15 minutes, then cool and scoop out the pulp.\n\nBlend the pulp with sugar, roasted cumin powder, black salt and a few mint leaves into a smooth concentrate.\n\nTo serve, mix a few spoons of the concentrate with chilled water and ice.\n\nStir well and garnish with mint. Serve cold.',
     ingredients: [
@@ -1039,6 +1098,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'South Indian',
     prepMinutes: 5,
     cookMinutes: 10,
+    servings: 3,
     instructions:
       'Add the coffee powder to the upper chamber of a filter, press with the plunger, and pour over hot water.\n\nLet it drip slowly for 10 minutes to collect a strong dark decoction.\n\nHeat the milk with sugar until hot and frothy.\n\nPour a measure of decoction into a tumbler, add the hot milk, and mix by pouring between tumbler and dabarah until frothy. Serve hot.',
     ingredients: [
@@ -1054,6 +1114,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 20,
     cookMinutes: 0,
+    servings: 4,
     instructions:
       'Soak the almonds, cashews, melon seeds, poppy seeds, fennel and peppercorns in water for 2 hours.\n\nGrind the soaked mixture with cardamom and a little milk into a smooth paste.\n\nWhisk the paste into chilled milk with sugar and a pinch of saffron until well combined.\n\nStrain for a smooth texture, chill, and serve cold over ice garnished with rose petals.',
     ingredients: [
@@ -1074,6 +1135,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 10,
     cookMinutes: 0,
+    servings: 4,
     instructions:
       'Blend mint and coriander with green chilli, ginger and a little water into a fine paste.\n\nMix the paste with cold water, tamarind pulp, roasted cumin powder, black salt, chaat masala and sugar.\n\nStir thoroughly until everything dissolves and taste for the tangy-spicy balance.\n\nStrain, chill, and serve over ice with a little boondi floated on top.',
     ingredients: [
@@ -1093,6 +1155,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 15,
     cookMinutes: 15,
+    servings: 4,
     instructions:
       'Blanch the almonds in hot water for 10 minutes, then peel and grind to a fine paste with a little milk.\n\nBring the milk to a boil and simmer for 5 minutes, stirring.\n\nAdd the almond paste, sugar, cardamom and a pinch of saffron, and simmer for 5 minutes until slightly thick.\n\nServe hot in winter or chilled in summer, garnished with slivered pistachios.',
     ingredients: [
@@ -1110,6 +1173,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 5,
     cookMinutes: 0,
+    servings: 3,
     instructions:
       'Whisk the yogurt with cold water until thin and frothy.\n\nAdd roasted cumin powder, black salt, chopped green chilli, ginger and coriander.\n\nStir well and taste for the salty-spicy balance.\n\nStrain if you prefer it smooth, then serve chilled over ice with a curry leaf tempering if you like.',
     ingredients: [
@@ -1130,6 +1194,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 20,
     cookMinutes: 30,
+    servings: 10,
     instructions:
       'Make a sugar syrup with sugar, water, cardamom and a few saffron strands; simmer for 8 minutes until slightly sticky, then keep warm.\n\nKnead the milk powder with flour, a pinch of baking soda, ghee and a little milk into a soft, crack-free dough.\n\nShape into smooth small balls with no cracks so they do not break while frying.\n\nDeep-fry on low heat for 6 minutes, stirring gently, until evenly deep golden brown.\n\nDrop the hot jamuns straight into the warm syrup and soak for at least 60 minutes before serving.',
     ingredients: [
@@ -1150,6 +1215,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 10,
     cookMinutes: 45,
+    servings: 6,
     instructions:
       'Rinse and soak the rice for 20 minutes, then drain.\n\nBring the milk to a boil in a heavy pan, add the rice, and simmer on low for 30 minutes, stirring often, until the rice is soft and the milk thickens.\n\nAdd sugar, cardamom, and simmer for 8 minutes more.\n\nStir in soaked saffron, chopped almonds, cashews and raisins.\n\nServe warm or chilled, garnished with more nuts.',
     ingredients: [
@@ -1169,6 +1235,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'North Indian',
     prepMinutes: 20,
     cookMinutes: 45,
+    servings: 8,
     instructions:
       'Grate the carrots finely.\n\nBring the milk to a boil, add the grated carrots, and cook on medium heat for 25 minutes, stirring, until the milk is absorbed.\n\nAdd ghee and sauté for 8 minutes until the carrots turn glossy and deep orange.\n\nStir in sugar and cook for 8 minutes more until it thickens again.\n\nFinish with cardamom and fried nuts. Serve warm.',
     ingredients: [
@@ -1187,6 +1254,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Bengali',
     prepMinutes: 30,
     cookMinutes: 30,
+    servings: 8,
     instructions:
       'Boil the milk, add lemon juice to curdle it, then strain the chhena through muslin and rinse to remove sourness.\n\nHang for 30 minutes to drain, then knead the chhena for 8 minutes until smooth and soft.\n\nShape into smooth crack-free balls.\n\nMake a light sugar syrup and bring to a rolling boil; drop in the balls, cover, and boil for 15 minutes until they double in size and turn spongy.\n\nCool in the syrup and serve chilled.',
     ingredients: [
@@ -1203,6 +1271,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 15,
     cookMinutes: 20,
+    servings: 8,
     instructions:
       'Grind the cashews into a fine powder, taking care not to release their oil.\n\nMake a one-string sugar syrup with sugar and water.\n\nAdd the cashew powder and cardamom and cook on low for 6 minutes, stirring constantly, until it forms a soft dough that leaves the sides.\n\nTransfer to a greased sheet, roll thin while warm, and cover with edible silver leaf.\n\nCool for 10 minutes, then cut into diamonds.',
     ingredients: [
@@ -1219,6 +1288,7 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
     cuisine: 'Indian',
     prepMinutes: 20,
     cookMinutes: 20,
+    servings: 8,
     instructions:
       'Whisk the flour with yogurt and water into a smooth batter and ferment for at least 8 hours until slightly sour.\n\nMake a one-string sugar syrup with sugar, water, saffron and cardamom, and keep warm.\n\nFill the batter into a squeeze bottle and pipe spiral coils directly into hot oil.\n\nFry for 2 minutes until crisp and golden on both sides.\n\nImmediately dip the hot jalebis in the warm syrup for 30 seconds, then lift out and serve hot.',
     ingredients: [
@@ -1228,6 +1298,411 @@ export const INDIAN_RECIPES: SeedRecipe[] = [
       { name: 'Sugar', measure: '1.5 cups' },
       { name: 'Saffron', measure: '1 pinch' },
       { name: 'Cardamom', measure: '1/2 tsp' },
+      { name: 'Oil', measure: '500 ml' },
+    ],
+  },
+
+  // ==================== MORE TIFFINS, MEALS & SNACKS ====================
+  // Added with explicit servings; quantities are home-kitchen batches.
+  {
+    name: 'Ven Pongal',
+    category: 'Breakfast',
+    cuisine: 'South Indian',
+    prepMinutes: 10,
+    cookMinutes: 25,
+    servings: 4,
+    instructions:
+      'Dry roast the moong dal for 3 minutes until it smells nutty, then wash it with the rice.\n\nPressure cook the rice and dal with the water and salt for 15 minutes (about 4 whistles) until very soft, then mash lightly.\n\nHeat ghee, add cumin seeds, crushed black pepper, ginger, cashews and curry leaves, and fry for 1 minute until the cashews turn golden.\n\nPour the tempering over the pongal, mix well and cook for 2 minutes. Serve hot with coconut chutney and sambar.',
+    ingredients: [
+      { name: 'Raw rice', measure: '1 cup' },
+      { name: 'Moong dal', measure: '1/2 cup' },
+      { name: 'Water', measure: '4 cups' },
+      { name: 'Ghee', measure: '3 tbsp' },
+      { name: 'Black pepper', measure: '1 tsp' },
+      { name: 'Cumin seeds', measure: '1 tsp' },
+      { name: 'Ginger', measure: '1 tbsp' },
+      { name: 'Cashews', measure: '10' },
+      { name: 'Curry leaves', measure: '10' },
+      { name: 'Salt', measure: '1 tsp' },
+    ],
+  },
+  {
+    name: 'Pesarattu',
+    category: 'Breakfast',
+    cuisine: 'Andhra',
+    prepMinutes: 15,
+    cookMinutes: 20,
+    servings: 4,
+    instructions:
+      'Soak the whole green moong and rice for at least 6 hours, then drain.\n\nGrind with green chilli, ginger, cumin and salt to a smooth batter, adding the water little by little.\n\nHeat a tawa, pour a ladle of batter and spread it thin. Sprinkle chopped onion on top and drizzle oil around the edges.\n\nCook for 2 minutes until the base is crisp, flip and cook for 1 minute more. Serve hot with ginger chutney or upma.',
+    ingredients: [
+      { name: 'Moong dal (whole green)', measure: '1 cup' },
+      { name: 'Rice', measure: '2 tbsp' },
+      { name: 'Green chilli', measure: '2' },
+      { name: 'Ginger', measure: '1 tbsp' },
+      { name: 'Cumin seeds', measure: '1 tsp' },
+      { name: 'Onion', measure: '1' },
+      { name: 'Water', measure: '1 cup' },
+      { name: 'Oil', measure: '3 tbsp' },
+      { name: 'Salt', measure: '1 tsp' },
+    ],
+  },
+  {
+    name: 'Appam',
+    category: 'Breakfast',
+    cuisine: 'Kerala',
+    prepMinutes: 20,
+    cookMinutes: 20,
+    servings: 6,
+    instructions:
+      'Soak the rice for 5 hours, then grind it with the coconut, cooked rice and water to a smooth, pourable batter.\n\nStir in the sugar, yeast and salt and leave to ferment for 8 hours until doubled and bubbly.\n\nHeat an appam pan and wipe it with a little oil. Pour in a ladle of batter and swirl the pan so the edges coat thinly.\n\nCover and cook for 2 minutes until the centre is soft and spongy and the edges are crisp. Serve with vegetable stew or kurma.',
+    ingredients: [
+      { name: 'Rice', measure: '2 cups' },
+      { name: 'Coconut', measure: '1 cup' },
+      { name: 'Cooked rice', measure: '1/4 cup' },
+      { name: 'Water', measure: '1.5 cups' },
+      { name: 'Sugar', measure: '2 tbsp' },
+      { name: 'Yeast', measure: '1/2 tsp' },
+      { name: 'Salt', measure: '1 tsp' },
+      { name: 'Oil', measure: '1 tsp' },
+    ],
+  },
+  {
+    name: 'Poori Bhaji',
+    category: 'Breakfast',
+    cuisine: 'North Indian',
+    prepMinutes: 25,
+    cookMinutes: 25,
+    servings: 4,
+    instructions:
+      'Knead the wheat flour and semolina with a pinch of salt and the water into a stiff dough. Rest for 15 minutes.\n\nFor the bhaji, heat 2 tbsp of the oil, crackle mustard seeds and curry leaves, then add onion, green chilli and ginger and sauté for 3 minutes.\n\nAdd turmeric, the boiled potatoes broken into chunks and the cup of water. Simmer for 5 minutes until thick.\n\nRoll small discs of dough and deep fry in hot oil for 1 minute each, pressing gently so they puff. Drain and serve hot with the bhaji.',
+    ingredients: [
+      { name: 'Wheat flour', measure: '2 cups' },
+      { name: 'Semolina', measure: '2 tbsp' },
+      { name: 'Water', measure: '3/4 cup' },
+      { name: 'Oil', measure: '500 ml' },
+      { name: 'Potato', measure: '4, boiled' },
+      { name: 'Onion', measure: '1' },
+      { name: 'Green chilli', measure: '2' },
+      { name: 'Ginger', measure: '1 tsp' },
+      { name: 'Mustard seeds', measure: '1 tsp' },
+      { name: 'Turmeric', measure: '1/2 tsp' },
+      { name: 'Curry leaves', measure: '8' },
+      { name: 'Water', measure: '1 cup' },
+    ],
+  },
+  {
+    name: 'Methi Thepla',
+    category: 'Breakfast',
+    cuisine: 'Gujarati',
+    prepMinutes: 15,
+    cookMinutes: 20,
+    servings: 4,
+    instructions:
+      'Mix the wheat flour, gram flour, chopped methi leaves, yogurt, turmeric, chilli powder, sesame seeds, salt and 1 tbsp oil.\n\nKnead with the water into a soft dough and rest for 10 minutes.\n\nDivide into 12 balls and roll each into a thin circle.\n\nCook on a hot tawa for 1 minute a side, brushing with a little oil, until golden spots appear. Serve warm with curd or pickle.',
+    ingredients: [
+      { name: 'Wheat flour', measure: '2 cups' },
+      { name: 'Gram flour (besan)', measure: '1/4 cup' },
+      { name: 'Fenugreek leaves (methi)', measure: '1 cup' },
+      { name: 'Yogurt', measure: '1/4 cup' },
+      { name: 'Turmeric', measure: '1/2 tsp' },
+      { name: 'Red chilli powder', measure: '1 tsp' },
+      { name: 'Sesame seeds', measure: '1 tsp' },
+      { name: 'Oil', measure: '3 tbsp' },
+      { name: 'Water', measure: '1/2 cup' },
+      { name: 'Salt', measure: '1 tsp' },
+    ],
+  },
+  {
+    name: 'Khaman Dhokla',
+    category: 'Breakfast',
+    cuisine: 'Gujarati',
+    prepMinutes: 15,
+    cookMinutes: 20,
+    servings: 4,
+    instructions:
+      'Whisk the gram flour, semolina, yogurt, water, ginger, green chilli, sugar, lemon juice and salt into a smooth batter. Rest for 10 minutes.\n\nGrease a tin, then stir the fruit salt into the batter until it froths and pour it straight in.\n\nSteam for 15 minutes until a toothpick comes out clean, and cool for 5 minutes.\n\nHeat the oil, crackle mustard seeds and curry leaves, pour over the dhokla with 2 tbsp water, and cut into squares.',
+    ingredients: [
+      { name: 'Gram flour (besan)', measure: '1.5 cups' },
+      { name: 'Semolina', measure: '1 tbsp' },
+      { name: 'Yogurt', measure: '1/2 cup' },
+      { name: 'Water', measure: '3/4 cup' },
+      { name: 'Ginger', measure: '1 tsp' },
+      { name: 'Green chilli', measure: '2' },
+      { name: 'Sugar', measure: '1 tbsp' },
+      { name: 'Lemon juice', measure: '1 tbsp' },
+      { name: 'Fruit salt (Eno)', measure: '1 tsp' },
+      { name: 'Oil', measure: '2 tbsp' },
+      { name: 'Mustard seeds', measure: '1 tsp' },
+      { name: 'Curry leaves', measure: '10' },
+    ],
+  },
+  {
+    name: 'Plain Dosa',
+    category: 'Breakfast',
+    cuisine: 'South Indian',
+    prepMinutes: 20,
+    cookMinutes: 25,
+    servings: 6,
+    instructions:
+      'Soak the rice with the fenugreek seeds, and the urad dal separately, for 6 hours.\n\nGrind each to a smooth batter with the water, mix with salt and ferment overnight.\n\nHeat a tawa, pour a ladle of batter in the centre and spread it thin in circles.\n\nDrizzle a little oil around the edge and cook for 2 minutes until crisp and golden. Fold and serve with chutney and sambar.',
+    ingredients: [
+      { name: 'Rice', measure: '2 cups' },
+      { name: 'Urad dal', measure: '1/2 cup' },
+      { name: 'Fenugreek seeds', measure: '1 tsp' },
+      { name: 'Water', measure: '1.5 cups' },
+      { name: 'Oil', measure: '3 tbsp' },
+      { name: 'Salt', measure: '1 tsp' },
+    ],
+  },
+  {
+    name: 'Semiya Upma',
+    category: 'Breakfast',
+    cuisine: 'South Indian',
+    prepMinutes: 10,
+    cookMinutes: 15,
+    servings: 3,
+    instructions:
+      'Dry roast the vermicelli for 4 minutes until golden, then set aside.\n\nHeat oil, crackle mustard seeds and urad dal, then add curry leaves, onion, green chilli and ginger and sauté for 3 minutes.\n\nAdd the carrot and peas with the water and salt and bring to a boil.\n\nStir in the vermicelli, cover and cook on low for 5 minutes until the water is absorbed. Finish with lemon juice.',
+    ingredients: [
+      { name: 'Vermicelli', measure: '150 g' },
+      { name: 'Onion', measure: '1' },
+      { name: 'Green chilli', measure: '2' },
+      { name: 'Ginger', measure: '1 tsp' },
+      { name: 'Carrot', measure: '1' },
+      { name: 'Peas', measure: '1/4 cup' },
+      { name: 'Mustard seeds', measure: '1 tsp' },
+      { name: 'Urad dal', measure: '1 tsp' },
+      { name: 'Curry leaves', measure: '8' },
+      { name: 'Water', measure: '2.5 cups' },
+      { name: 'Oil', measure: '2 tbsp' },
+      { name: 'Lemon juice', measure: '1 tsp' },
+    ],
+  },
+  {
+    name: 'Whole Wheat Chapati',
+    category: 'Side',
+    cuisine: 'North Indian',
+    prepMinutes: 20,
+    cookMinutes: 15,
+    servings: 5,
+    instructions:
+      'Knead the wheat flour and salt with the water into a soft, smooth dough. Cover and rest for 20 minutes.\n\nDivide into 10 balls and roll each thin, dusting with flour.\n\nCook on a hot tawa for 30 seconds until bubbles appear, flip, then puff directly over the flame for a few seconds.\n\nBrush lightly with ghee and keep wrapped in a cloth until serving.',
+    ingredients: [
+      { name: 'Wheat flour', measure: '2 cups' },
+      { name: 'Water', measure: '3/4 cup' },
+      { name: 'Ghee', measure: '1 tbsp' },
+      { name: 'Salt', measure: '1/2 tsp' },
+    ],
+  },
+  {
+    name: 'Moong Dal Tadka',
+    category: 'Lunch',
+    cuisine: 'North Indian',
+    prepMinutes: 10,
+    cookMinutes: 25,
+    servings: 4,
+    instructions:
+      'Wash the moong dal and pressure cook it with the water and turmeric for 10 minutes until soft, then whisk smooth.\n\nHeat ghee, add cumin seeds and garlic and fry for 1 minute until golden.\n\nAdd the onion and cook for 3 minutes, then the tomato and chilli powder for 3 minutes more.\n\nPour the tadka into the dal, simmer for 5 minutes, and finish with lemon juice and coriander.',
+    ingredients: [
+      { name: 'Moong dal', measure: '1 cup' },
+      { name: 'Water', measure: '3 cups' },
+      { name: 'Tomato', measure: '1' },
+      { name: 'Onion', measure: '1' },
+      { name: 'Garlic', measure: '4 cloves' },
+      { name: 'Cumin seeds', measure: '1 tsp' },
+      { name: 'Turmeric', measure: '1/2 tsp' },
+      { name: 'Red chilli powder', measure: '1/2 tsp' },
+      { name: 'Ghee', measure: '2 tbsp' },
+      { name: 'Coriander', measure: '2 tbsp' },
+      { name: 'Lemon juice', measure: '1 tsp' },
+    ],
+  },
+  {
+    name: 'Bisi Bele Bath',
+    category: 'Lunch',
+    cuisine: 'Karnataka',
+    prepMinutes: 15,
+    cookMinutes: 35,
+    servings: 5,
+    instructions:
+      'Pressure cook the rice and toor dal with 4 cups of the water for 15 minutes until very soft.\n\nBoil the mixed vegetables in the remaining water for 8 minutes, then add the tamarind, bisi bele bath powder and jaggery.\n\nStir in the cooked rice and dal and simmer for 10 minutes, adding hot water if it gets too thick.\n\nFry the cashews, mustard seeds and curry leaves in ghee for 1 minute and pour over. Serve hot with boondi or papad.',
+    ingredients: [
+      { name: 'Rice', measure: '1 cup' },
+      { name: 'Toor dal', measure: '1/2 cup' },
+      { name: 'Mixed vegetables', measure: '2 cups' },
+      { name: 'Water', measure: '6 cups' },
+      { name: 'Tamarind', measure: '1 tbsp' },
+      { name: 'Bisi bele bath masala powder', measure: '3 tbsp' },
+      { name: 'Jaggery', measure: '1 tsp' },
+      { name: 'Ghee', measure: '3 tbsp' },
+      { name: 'Cashews', measure: '10' },
+      { name: 'Mustard seeds', measure: '1 tsp' },
+      { name: 'Curry leaves', measure: '10' },
+    ],
+  },
+  {
+    name: 'Vegetable Khichdi',
+    category: 'Dinner',
+    cuisine: 'North Indian',
+    prepMinutes: 10,
+    cookMinutes: 25,
+    servings: 4,
+    instructions:
+      'Wash the rice and moong dal together and soak for 15 minutes.\n\nHeat ghee in a pressure cooker, add cumin seeds, asafoetida and ginger and fry for 30 seconds.\n\nAdd the mixed vegetables and turmeric and sauté for 2 minutes, then the rice, dal, salt and water.\n\nPressure cook for 12 minutes (3 whistles) and let the pressure drop on its own. Serve with curd, pickle and papad.',
+    ingredients: [
+      { name: 'Rice', measure: '1/2 cup' },
+      { name: 'Moong dal', measure: '1/2 cup' },
+      { name: 'Mixed vegetables', measure: '1.5 cups' },
+      { name: 'Water', measure: '4 cups' },
+      { name: 'Ghee', measure: '2 tbsp' },
+      { name: 'Cumin seeds', measure: '1 tsp' },
+      { name: 'Ginger', measure: '1 tsp' },
+      { name: 'Turmeric', measure: '1/2 tsp' },
+      { name: 'Asafoetida', measure: '1 pinch' },
+      { name: 'Salt', measure: '1 tsp' },
+    ],
+  },
+  {
+    name: 'Home-style Chicken Curry',
+    category: 'Dinner',
+    cuisine: 'North Indian',
+    prepMinutes: 15,
+    cookMinutes: 40,
+    servings: 4,
+    instructions:
+      'Marinate the chicken in yogurt, turmeric and half the chilli powder for 20 minutes.\n\nHeat oil and fry the onions for 10 minutes until deep golden, then add the ginger garlic paste and cook for 1 minute.\n\nAdd the tomatoes, coriander powder and remaining chilli powder and cook for 6 minutes until the oil separates.\n\nAdd the chicken and sear for 5 minutes, then pour in the water, cover and simmer for 20 minutes until tender. Finish with garam masala and coriander.',
+    ingredients: [
+      { name: 'Chicken', measure: '750 g' },
+      { name: 'Onion', measure: '3' },
+      { name: 'Tomato', measure: '2' },
+      { name: 'Yogurt', measure: '1/2 cup' },
+      { name: 'Ginger garlic paste', measure: '2 tbsp' },
+      { name: 'Turmeric', measure: '1/2 tsp' },
+      { name: 'Coriander powder', measure: '1 tbsp' },
+      { name: 'Red chilli powder', measure: '1 tsp' },
+      { name: 'Garam masala', measure: '1 tsp' },
+      { name: 'Oil', measure: '3 tbsp' },
+      { name: 'Water', measure: '1 cup' },
+      { name: 'Coriander', measure: '2 tbsp' },
+    ],
+  },
+  {
+    name: 'Aloo Matar',
+    category: 'Lunch',
+    cuisine: 'North Indian',
+    prepMinutes: 10,
+    cookMinutes: 25,
+    servings: 4,
+    instructions:
+      'Heat oil, add cumin seeds and let them sizzle, then add the onion and cook for 4 minutes.\n\nAdd the ginger garlic paste and tomatoes with turmeric, coriander powder and chilli powder. Cook for 6 minutes until soft.\n\nAdd the cubed potatoes, peas and water, cover and simmer for 15 minutes until the potatoes are tender.\n\nStir in garam masala and serve with roti or rice.',
+    ingredients: [
+      { name: 'Potato', measure: '3' },
+      { name: 'Peas', measure: '1 cup' },
+      { name: 'Onion', measure: '1' },
+      { name: 'Tomato', measure: '2' },
+      { name: 'Ginger garlic paste', measure: '1 tbsp' },
+      { name: 'Cumin seeds', measure: '1 tsp' },
+      { name: 'Turmeric', measure: '1/2 tsp' },
+      { name: 'Coriander powder', measure: '1 tbsp' },
+      { name: 'Red chilli powder', measure: '1 tsp' },
+      { name: 'Garam masala', measure: '1/2 tsp' },
+      { name: 'Oil', measure: '2 tbsp' },
+      { name: 'Water', measure: '1.5 cups' },
+    ],
+  },
+  {
+    name: 'Vegetable Kurma',
+    category: 'Dinner',
+    cuisine: 'South Indian',
+    prepMinutes: 15,
+    cookMinutes: 25,
+    servings: 4,
+    instructions:
+      'Grind the coconut, cashews, fennel seeds and green chilli with a little water to a smooth paste.\n\nHeat oil, cook the onion for 4 minutes, then the ginger garlic paste and tomato for 3 minutes.\n\nAdd the mixed vegetables and water, cover and cook for 10 minutes until just tender.\n\nStir in the coconut paste and garam masala and simmer for 5 minutes. Serve with appam, parotta or chapati.',
+    ingredients: [
+      { name: 'Mixed vegetables', measure: '3 cups' },
+      { name: 'Onion', measure: '1' },
+      { name: 'Tomato', measure: '1' },
+      { name: 'Coconut', measure: '1/2 cup' },
+      { name: 'Cashews', measure: '10' },
+      { name: 'Fennel seeds', measure: '1 tsp' },
+      { name: 'Green chilli', measure: '2' },
+      { name: 'Ginger garlic paste', measure: '1 tbsp' },
+      { name: 'Garam masala', measure: '1 tsp' },
+      { name: 'Oil', measure: '2 tbsp' },
+      { name: 'Water', measure: '1.5 cups' },
+    ],
+  },
+  {
+    name: 'Tomato Rice',
+    category: 'Lunch',
+    cuisine: 'South Indian',
+    prepMinutes: 10,
+    cookMinutes: 20,
+    servings: 3,
+    instructions:
+      'Heat oil, crackle mustard seeds and curry leaves, then add onion and green chilli and sauté for 3 minutes.\n\nAdd the ginger garlic paste and chopped tomatoes with turmeric, chilli powder and salt. Cook for 8 minutes until the tomatoes break down into a thick masala.\n\nFold in the cooked rice gently and cook for 3 minutes so every grain is coated.\n\nFinish with coriander and serve with raita or potato fry.',
+    ingredients: [
+      { name: 'Rice', measure: '3 cups cooked' },
+      { name: 'Tomato', measure: '4' },
+      { name: 'Onion', measure: '1' },
+      { name: 'Green chilli', measure: '2' },
+      { name: 'Ginger garlic paste', measure: '1 tsp' },
+      { name: 'Mustard seeds', measure: '1 tsp' },
+      { name: 'Curry leaves', measure: '10' },
+      { name: 'Turmeric', measure: '1/2 tsp' },
+      { name: 'Red chilli powder', measure: '1 tsp' },
+      { name: 'Oil', measure: '3 tbsp' },
+      { name: 'Coriander', measure: '2 tbsp' },
+    ],
+  },
+  {
+    name: 'Punjabi Samosa',
+    category: 'Starter',
+    cuisine: 'Punjabi',
+    prepMinutes: 40,
+    cookMinutes: 30,
+    servings: 6,
+    instructions:
+      'Rub the ghee into the flour and ajwain until crumbly, then knead with the water into a stiff dough. Rest for 20 minutes.\n\nFor the filling, toast the cumin seeds, add green chilli, ginger and peas and cook for 3 minutes, then add the mashed potatoes, coriander powder, garam masala, amchur and salt.\n\nRoll the dough into ovals, cut in half, shape each half into a cone, fill and seal with a little water.\n\nFry in medium-hot oil for 10 minutes, turning, until crisp and golden. Serve with mint and tamarind chutney.',
+    ingredients: [
+      { name: 'Flour', measure: '2 cups' },
+      { name: 'Ajwain', measure: '1/2 tsp' },
+      { name: 'Ghee', measure: '4 tbsp' },
+      { name: 'Water', measure: '1/2 cup' },
+      { name: 'Potato', measure: '4, boiled' },
+      { name: 'Peas', measure: '1/2 cup' },
+      { name: 'Green chilli', measure: '2' },
+      { name: 'Ginger', measure: '1 tsp' },
+      { name: 'Cumin seeds', measure: '1 tsp' },
+      { name: 'Coriander powder', measure: '1 tsp' },
+      { name: 'Garam masala', measure: '1 tsp' },
+      { name: 'Amchur (dry mango)', measure: '1 tsp' },
+      { name: 'Oil', measure: '750 ml' },
+    ],
+  },
+  {
+    name: 'Vada Pav',
+    category: 'Starter',
+    cuisine: 'Maharashtrian',
+    prepMinutes: 25,
+    cookMinutes: 25,
+    servings: 4,
+    instructions:
+      'Temper mustard seeds, curry leaves, garlic, green chilli and ginger in 1 tbsp oil, add turmeric and the mashed potatoes, and cook for 3 minutes. Shape into 8 balls.\n\nWhisk the gram flour with salt and the water into a thick batter.\n\nDip each potato ball in the batter and deep fry for 4 minutes until golden.\n\nSlit the pav, spread green chutney inside, add a hot vada and press together. Serve straight away.',
+    ingredients: [
+      { name: 'Potato', measure: '4, boiled' },
+      { name: 'Gram flour (besan)', measure: '1 cup' },
+      { name: 'Garlic', measure: '5 cloves' },
+      { name: 'Green chilli', measure: '3' },
+      { name: 'Ginger', measure: '1 tsp' },
+      { name: 'Mustard seeds', measure: '1 tsp' },
+      { name: 'Turmeric', measure: '1/2 tsp' },
+      { name: 'Curry leaves', measure: '8' },
+      { name: 'Water', measure: '1/2 cup' },
+      { name: 'Pav', measure: '8' },
+      { name: 'Green chutney', measure: '1/2 cup' },
       { name: 'Oil', measure: '500 ml' },
     ],
   },

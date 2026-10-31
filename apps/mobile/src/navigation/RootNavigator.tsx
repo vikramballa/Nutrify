@@ -24,6 +24,7 @@ import { ProgressScreen } from '../screens/ProgressScreen';
 import { LogMealScreen } from '../screens/LogMealScreen';
 import { ProfileSetupScreen } from '../screens/ProfileSetupScreen';
 import { SavedScreen } from '../screens/SavedScreen';
+import { ShopRecipeScreen } from '../screens/ShopRecipeScreen';
 import { BarcodeScreen } from '../screens/BarcodeScreen';
 import type { RootStackParamList, TabParamList } from './types';
 
@@ -225,6 +226,11 @@ export function RootNavigator() {
         name="Barcode"
         component={BarcodeScreen}
         options={{ headerShown: true, title: 'Scan a Barcode' }}
+      />
+      <Stack.Screen
+        name="ShopRecipe"
+        component={ShopRecipeScreen}
+        options={{ headerShown: true, title: 'What do you have?' }}
       />
     </Stack.Navigator>
   );

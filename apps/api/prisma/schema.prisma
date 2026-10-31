@@ -223,6 +223,8 @@ model GroceryItem {
   recipeId   String?
   recipe     Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
   recipeName String?
+  // What the recipe calls for ("500 g"), copied from its ingredient line.
+  quantity   String?
   checked    Boolean  @default(false)
   createdAt  DateTime @default(now())
 
@@ -250,6 +252,11 @@ model Recipe {
   // Estimated servings the macros above are divided by (sources carry none).
   // Null = computed before estimation existed; recomputed on next access.
   servings     Int?
+  // Grams in one serving of the finished dish (total weight ÷ servings).
+  servingGrams Int?
+  // Servings the recipe itself states (curated or AI-written); when set it
+  // replaces the weight-based estimate above.
+  declaredServings Int?
   ingredients  Ingredient[]
   insights     RecipeInsight?
   searchTerms  SearchTerm[]

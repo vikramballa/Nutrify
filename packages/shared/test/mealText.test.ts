@@ -50,3 +50,28 @@ describe('parseMealText', () => {
     expect(parseMealText(' , 3 ,, and ')).toEqual([]);
   });
 });
+
+describe('parseMealText — Indian household measures', () => {
+  it('reads plate, katori, ladle and tumbler as units', () => {
+    expect(parseMealText('1 plate poha, 2 katori dal, a ladle of sambar, 1 tumbler buttermilk')).toEqual([
+      { name: 'poha', measure: '1 plate' },
+      { name: 'dal', measure: '2 katori' },
+      { name: 'sambar', measure: '1 ladle' },
+      { name: 'buttermilk', measure: '1 tumbler' },
+    ]);
+  });
+
+  it('splits on "with" and reads counts before or after the food', () => {
+    expect(parseMealText('3 idli with sambar, dosa x2, 2 pcs vada, 4x puri')).toEqual([
+      { name: 'idli', measure: '3' },
+      { name: 'sambar', measure: '1' },
+      { name: 'dosa', measure: '2' },
+      { name: 'vada', measure: '2' },
+      { name: 'puri', measure: '4' },
+    ]);
+  });
+
+  it('keeps a number that is part of the dish name', () => {
+    expect(parseMealText('chicken 65')).toEqual([{ name: 'chicken 65', measure: '1' }]);
+  });
+});

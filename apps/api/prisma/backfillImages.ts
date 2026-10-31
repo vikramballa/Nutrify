@@ -12,6 +12,10 @@ import { prisma } from '../src/lib/prisma.js';
  *
  *   npm run db:backfill-images -w apps/api
  *   npm run db:backfill-images -w apps/api -- --save ./recipe-photos
+ *   npm run db:backfill-images -w apps/api -- --only in- --save ./recipe-photos
+ *
+ * --only <prefix> limits the run to recipes whose externalId starts with it
+ * (in- = the curated Indian set), so the hourly quota isn't spent elsewhere.
  */
 
 const KEY = process.env.PEXELS_API_KEY;
@@ -64,16 +68,29 @@ async function main() {
   const saveDir = saveFlag !== -1 ? process.argv[saveFlag + 1] : null;
   if (saveDir) await mkdir(saveDir, { recursive: true });
 
+  const onlyFlag = process.argv.indexOf('--only');
+  const only = onlyFlag !== -1 ? process.argv[onlyFlag + 1] : null;
+
   const missing = await prisma.recipe.findMany({
-    where: { OR: [{ imageUrl: null }, { imageUrl: '' }] },
+    where: {
+      OR: [{ imageUrl: null }, { imageUrl: '' }],
+      ...(only ? { externalId: { startsWith: only } } : {}),
+    },
     select: { id: true, name: true, cuisine: true, category: true },
     orderBy: { createdAt: 'asc' },
   });
   console.log(`[images] ${missing.length} recipes missing a photo`);
 
   // Reusing one photo across recipes makes the grid look broken, so each
-  // picked photo id is retired for the rest of the run.
-  const used = new Set<number>();
+  // picked photo id is retired — including those earlier runs already gave
+  // to other recipes.
+  const taken = await prisma.recipe.findMany({
+    where: { imageUrl: { contains: 'pexels.com/photos/' } },
+    select: { imageUrl: true },
+  });
+  const used = new Set<number>(
+    taken.map((r) => Number(r.imageUrl!.match(/photos\/(\d+)\//)?.[1])).filter(Boolean),
+  );
   let filled = 0;
   const failed: string[] = [];
 

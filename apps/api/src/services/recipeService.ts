@@ -27,6 +27,30 @@ export function normalizeCuisine(cuisine: string): string {
   return CUISINE_ALIASES[cuisine.trim().toLowerCase()] ?? cuisine.trim();
 }
 
+// Regional labels stay on the recipe ("South Indian" on an idli is useful),
+// but browse by the country: an "Indian" chip that skipped every South Indian,
+// Punjabi and Maharashtrian recipe showed no tiffins at all.
+const CUISINE_FAMILIES: Record<string, string[]> = {
+  Indian: [
+    'Indian', 'India', 'South Indian', 'North Indian', 'Punjabi', 'Maharashtrian', 'Hyderabadi',
+    'Goan', 'Kashmiri', 'Bengali', 'Gujarati', 'Rajasthani', 'Kerala', 'Chettinad',
+    'Tamil', 'Andhra', 'Karnataka', 'Udupi', 'Mughlai', 'Indo-Chinese',
+  ],
+};
+const FAMILY_OF = new Map(
+  Object.entries(CUISINE_FAMILIES).flatMap(([family, members]) => members.map((m) => [m, family])),
+);
+
+/** The browse chip a cuisine belongs under: "Punjabi" → "Indian". */
+export function cuisineFamily(cuisine: string): string {
+  return FAMILY_OF.get(cuisine) ?? cuisine;
+}
+
+/** Every stored cuisine label a browse chip covers. */
+export function cuisineMembers(cuisine: string): string[] {
+  return CUISINE_FAMILIES[cuisine] ?? [cuisine];
+}
+
 export function toDTO(r: RecipeWithIngredients): Recipe {
   return {
     id: r.id,
@@ -44,6 +68,7 @@ export function toDTO(r: RecipeWithIngredients): Recipe {
     carbs: r.carbs,
     fat: r.fat,
     servings: r.servings,
+    servingGrams: r.servingGrams,
     ingredients: [...r.ingredients]
       .sort((a, b) => a.position - b.position)
       .map((i) => ({ name: i.name, measure: i.measure, position: i.position })),
@@ -149,6 +174,7 @@ export async function search(
           prepMinutes: r.prepMinutes,
           cookMinutes: r.cookMinutes,
           source: 'AI',
+          declaredServings: r.servings ?? null,
           ingredients: {
             create: r.ingredients.map((ing, position) => ({
               name: ing.name,
@@ -245,7 +271,7 @@ export async function getByCuisine(
     }
   }
   const rows = await prisma.recipe.findMany({
-    where: { cuisine },
+    where: { cuisine: { in: cuisineMembers(cuisine) } },
     orderBy: [{ name: 'asc' }, { id: 'asc' }],
     include: { ingredients: true },
     take: page.take,
@@ -258,10 +284,8 @@ export async function getByCuisine(
  *  (TheMealDB's area list has ~195 entries, most empty — not usable as chips.) */
 export async function listCuisines(): Promise<string[]> {
   const db = await prisma.recipe.findMany({ select: { cuisine: true }, distinct: ['cuisine'] });
-  return db
-    .map((r) => r.cuisine)
-    .filter((c) => c && c !== 'Unknown')
-    .sort();
+  const chips = db.map((r) => cuisineFamily(r.cuisine)).filter((c) => c && c !== 'Unknown');
+  return [...new Set(chips)].sort();
 }
 
 export async function getById(id: string): Promise<Recipe | null> {

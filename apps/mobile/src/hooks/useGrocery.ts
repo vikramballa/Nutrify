@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { GroceryItemSchema, GroceryFromRecipeResponseSchema, type GroceryItem } from '@nutrichef/shared';
+import {
+  GroceryItemSchema,
+  GroceryFromRecipeResponseSchema,
+  type GroceryFromRecipeRequest,
+  type GroceryItem,
+} from '@nutrichef/shared';
 import { apiFetch, parseWith } from '../api/client';
 
 const KEY = ['grocery'];
@@ -23,15 +28,16 @@ export function useGrocery() {
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),
   });
 
-  // Adds a whole recipe's ingredients in one call; the server dedupes
-  // against what's already on the list, so re-tapping "Shop" is a no-op.
+  // Adds a recipe's missing ingredients (or all, without `names`) in one
+  // call; the server dedupes against what's already on the list and copies
+  // each quantity from the recipe.
   const addFromRecipe = useMutation({
-    mutationFn: async (recipeId: string) =>
+    mutationFn: async (input: GroceryFromRecipeRequest) =>
       parseWith(
         GroceryFromRecipeResponseSchema,
         await apiFetch('/grocery/from-recipe', {
           method: 'POST',
-          body: JSON.stringify({ recipeId }),
+          body: JSON.stringify(input),
         }),
         'grocery:addFromRecipe',
       ),

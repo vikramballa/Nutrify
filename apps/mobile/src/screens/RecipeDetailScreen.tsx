@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { MealType } from '@nutrichef/shared';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
@@ -13,10 +15,10 @@ import { BoldText } from '../components/BoldText';
 import { CookInstructions } from '../components/CookInstructions';
 import { splitSteps } from '../components/cookSteps';
 import { IngredientsList } from '../components/IngredientsList';
+import { BottomSheet } from '../components/BottomSheet';
 import { useInsights, useNutrition } from '../hooks/useInsights';
 import { useLogMeal, currentMealType } from '../hooks/useLogs';
 import { useFavorites, useToggleFavorite } from '../hooks/useFavorites';
-import { useGrocery } from '../hooks/useGrocery';
 import type { RootStackParamList } from '../navigation/types';
 
 function ActionButton({
@@ -64,8 +66,15 @@ function ActionButton({
 /** Hero height, and how far the image is allowed to drift while scrolling. */
 const HERO_HEIGHT = 300;
 
+/** Portions offered when logging — the API accepts 0.25 to 10 servings. */
+const PORTIONS = [0.5, 1, 1.5, 2, 3] as const;
+const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+const portionLabel = (p: number) =>
+  p === 0.5 ? '½ serving' : p === 1.5 ? '1½ servings' : `${p} serving${p === 1 ? '' : 's'}`;
+
 export function RecipeDetailScreen() {
-  const nav = useNavigation();
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { recipe } = useRoute<RouteProp<RootStackParamList, 'RecipeDetail'>>().params;
   const insights = useInsights(recipe.id);
@@ -73,11 +82,12 @@ export function RecipeDetailScreen() {
 
   const logMeal = useLogMeal();
   const [logged, setLogged] = useState(false);
+  const [logSheet, setLogSheet] = useState(false);
+  const [portion, setPortion] = useState(1);
+  const [mealType, setMealType] = useState<MealType>(currentMealType());
   const favorites = useFavorites();
   const toggleFav = useToggleFavorite();
   const isFav = favorites.data?.recipes.some((r) => r.id === recipe.id) ?? false;
-  const grocery = useGrocery();
-  const [addedToGrocery, setAddedToGrocery] = useState(false);
 
   // Real timings only — no invented cook time. Total shows when known.
   const total =
@@ -119,10 +129,16 @@ export function RecipeDetailScreen() {
     ],
   };
 
-  async function addIngredientsToGrocery() {
-    if (addedToGrocery) return;
-    await grocery.addFromRecipe.mutateAsync(recipe.id);
-    setAddedToGrocery(true);
+  function confirmLog() {
+    logMeal.mutate(
+      { recipeId: recipe.id, mealType, servings: portion },
+      {
+        onSuccess: () => {
+          setLogged(true);
+          setLogSheet(false);
+        },
+      },
+    );
   }
 
   return (
@@ -170,13 +186,8 @@ export function RecipeDetailScreen() {
               icon={logged ? 'checkmark' : 'add-circle-outline'}
               label={logged ? 'Logged' : 'Log meal'}
               primary
-              busy={logMeal.isPending}
-              onPress={() =>
-                logMeal.mutate(
-                  { recipeId: recipe.id, mealType: currentMealType() },
-                  { onSuccess: () => setLogged(true) },
-                )
-              }
+              done={logged}
+              onPress={() => setLogSheet(true)}
             />
             <ActionButton
               icon={isFav ? 'heart' : 'heart-outline'}
@@ -185,11 +196,9 @@ export function RecipeDetailScreen() {
               onPress={() => toggleFav.mutate(recipe.id)}
             />
             <ActionButton
-              icon={addedToGrocery ? 'checkmark' : 'cart-outline'}
-              label={addedToGrocery ? 'Added' : 'Shop'}
-              done={addedToGrocery}
-              busy={grocery.addFromRecipe.isPending}
-              onPress={addIngredientsToGrocery}
+              icon="cart-outline"
+              label="Shop"
+              onPress={() => nav.navigate('ShopRecipe', { recipe })}
             />
           </FadeIn>
 
@@ -204,6 +213,7 @@ export function RecipeDetailScreen() {
                   <Text style={type.caption}>
                     Recipe makes about {macros!.servings}{' '}
                     {macros!.servings === 1 ? 'serving' : 'servings'}
+                    {macros!.servingGrams ? ` · 1 serving ≈ ${macros!.servingGrams} g` : ''}
                   </Text>
                 </View>
                 <View style={styles.macrosRow}>
@@ -267,6 +277,60 @@ export function RecipeDetailScreen() {
         ]}
       />
 
+      <BottomSheet
+        visible={logSheet}
+        title={`Log ${recipe.name}`}
+        subtitle={
+          macros?.servingGrams
+            ? `1 serving ≈ ${macros.servingGrams} g · ${macros.calories} cal`
+            : macros
+              ? `1 serving · ${macros.calories} cal`
+              : undefined
+        }
+        onClose={() => setLogSheet(false)}
+      >
+        <View style={styles.sheetSection}>
+          <Text style={type.eyebrow}>HOW MUCH DID YOU EAT</Text>
+          <View style={styles.chipRow}>
+            {PORTIONS.map((p) => (
+              <SheetChip key={p} label={portionLabel(p)} active={p === portion} onPress={() => setPortion(p)} />
+            ))}
+          </View>
+        </View>
+        <View style={styles.sheetSection}>
+          <Text style={type.eyebrow}>WHEN</Text>
+          <View style={styles.chipRow}>
+            {MEAL_TYPES.map((m) => (
+              <SheetChip
+                key={m}
+                label={m[0].toUpperCase() + m.slice(1)}
+                active={m === mealType}
+                onPress={() => setMealType(m)}
+              />
+            ))}
+          </View>
+        </View>
+        {logMeal.isError && (
+          <Text style={styles.sheetError}>Could not log that meal. Try again.</Text>
+        )}
+        <PressableScale
+          onPress={confirmLog}
+          haptic
+          disabled={logMeal.isPending}
+          style={[styles.actionButton, styles.actionButtonPrimary, styles.sheetButton]}
+        >
+          {logMeal.isPending ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={[styles.actionLabel, styles.sheetButtonLabel]}>
+              {macros
+                ? `Log ${portionLabel(portion)} · ${Math.round(macros.calories * portion)} cal`
+                : `Log ${portionLabel(portion)}`}
+            </Text>
+          )}
+        </PressableScale>
+      </BottomSheet>
+
       {/* Back arrow */}
       <PressableScale
         onPress={() => nav.goBack()}
@@ -281,7 +345,37 @@ export function RecipeDetailScreen() {
   );
 }
 
+function SheetChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <PressableScale
+      onPress={onPress}
+      scaleTo={0.94}
+      style={[styles.chip, active && styles.chipActive]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+    >
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </PressableScale>
+  );
+}
+
 const styles = StyleSheet.create({
+  sheetSection: { gap: 10 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipText: { fontFamily: fonts.medium, fontSize: 13, color: colors.textSecondary },
+  chipTextActive: { color: '#fff', fontFamily: fonts.semibold },
+  sheetButton: { flex: 0, height: 54 },
+  sheetButtonLabel: { color: '#fff', fontSize: 15 },
+  sheetError: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger },
   statusBackdrop: {
     position: 'absolute',
     top: 0,

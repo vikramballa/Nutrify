@@ -30,16 +30,19 @@ const DRY_PASTA = m(371, 13, 75, 2);
 
 // Per-100g macros (USDA SR Legacy / Foundation, rounded).
 export const STATIC: Record<string, Per100g> = {
-  // meat & fish
-  chicken: m(239, 27, 0, 14),
-  beef: m(250, 26, 0, 15),
+  // meat & fish. The four everyday meats are stored RAW — recipes weigh them
+  // raw, and cooked values on raw weights overcounted every curry (a rogan
+  // josh read 85 g protein a serving). COOKED_YIELD converts typed logs.
+  chicken: m(150, 20, 0, 7.5), // mixed cuts, mostly skinless as Indian cooking uses it
+  beef: m(200, 19, 0, 13.5),
   sirloin: m(140, 21, 0, 6),
   ribeye: m(291, 19, 0, 23),
   steak: m(200, 26, 0, 10),
   'corned beef': m(250, 27, 0, 15),
-  pork: m(242, 27, 0, 14),
-  lamb: m(294, 25, 0, 21),
-  mutton: m(234, 33, 0, 11),
+  pork: m(200, 19, 0, 13),
+  lamb: m(230, 17.5, 0, 17.5),
+  mutton: m(120, 20, 0, 4.5), // goat, as "mutton" means in India
+
   bacon: m(541, 37, 1, 42),
   sausage: m(301, 12, 3, 27),
   chorizo: m(455, 24, 2, 38),
@@ -102,6 +105,7 @@ export const STATIC: Record<string, Per100g> = {
   baguette: m(274, 11, 52, 3),
   flatbread: m(297, 9, 52, 6),
   bun: m(280, 9, 50, 4),
+  pav: m(280, 9, 50, 4.5),
   breadcrumb: m(395, 13, 72, 5),
   tortilla: m(218, 6, 45, 3),
   'taco shell': m(470, 7, 62, 22),
@@ -141,6 +145,7 @@ export const STATIC: Record<string, Per100g> = {
   'moong dal': m(347, 24, 63, 1),
   'mixed grain': m(350, 11, 72, 3),
   sago: m(355, 0, 88, 0),
+  sabudana: m(355, 0, 88, 0),
   oat: m(389, 17, 66, 7),
   oatmeal: m(389, 17, 66, 7),
   granola: m(489, 14, 54, 24),
@@ -150,6 +155,7 @@ export const STATIC: Record<string, Per100g> = {
   // sugars & sweets
   sugar: m(387, 0, 100, 0),
   honey: m(304, 0, 82, 0),
+  jaggery: m(383, 0.4, 98, 0.1),
   syrup: m(260, 0, 67, 0),
   treacle: m(290, 1, 75, 0),
   molasses: m(290, 0, 75, 0),
@@ -383,6 +389,19 @@ export const COOKED_YIELD: Record<string, number> = {
   'moong dal': 3,
   dal: 3,
   daal: 3,
+  // Soaked/steamed rather than boiled, so they swell less.
+  poha: 2,
+  sago: 1.5,
+  sabudana: 1.5,
+  semolina: 3,
+  rava: 3,
+  // Meat loses water as it cooks: a factor below 1 is the same maths in
+  // reverse (raw per-100g ÷ 0.75 = cooked per-100g).
+  chicken: 0.75,
+  mutton: 0.7,
+  lamb: 0.7,
+  beef: 0.72,
+  pork: 0.75,
 };
 
 /** Grams per ml of the cooked food, where it differs from the dry density. */
@@ -425,7 +444,7 @@ export const DENSITY: Record<string, number> = {
   crouton: 0.13, boondi: 0.4, cereal: 0.15,
   // herbs & leaves
   mint: 0.1, coriander: 0.1, cilantro: 0.1, parsley: 0.1, basil: 0.1, dill: 0.1,
-  'curry leaves': 0.1, spinach: 0.12, kale: 0.28, lettuce: 0.2, cabbage: 0.3,
+  'curry leaves': 0.1, methi: 0.12, 'fenugreek leaves': 0.12, 'kasuri methi': 0.1, spinach: 0.12, kale: 0.28, lettuce: 0.2, cabbage: 0.3,
   // chopped vegetables & fruit
   onion: 0.66, tomato: 0.75, pepper: 0.6, capsicum: 0.6, carrot: 0.54,
   celery: 0.5, cucumber: 0.55, mushroom: 0.3, broccoli: 0.38, cauliflower: 0.45,
@@ -465,7 +484,7 @@ export const PIECE_GRAMS: Record<string, number> = {
   'chicken drumstick': 110, 'chicken wing': 90, 'lamb chop': 100, 'pork chop': 200,
   steak: 250, fillet: 150, 'lamb leg': 2000, 'leg of lamb': 2000, kidney: 60,
   // breads & bakes
-  tortilla: 45, 'taco shell': 13, pita: 60, bun: 60, roti: 40, chapati: 40,
+  tortilla: 45, 'taco shell': 13, pita: 60, bun: 60, pav: 35, roti: 40, chapati: 40,
   paratha: 80, naan: 90, baguette: 250, flatbread: 60, wonton: 8,
   digestive: 15, biscuit: 13, meringue: 15, 'mars bar': 51,
   'brussels sprout': 10, oyster: 15, 'black pudding': 40, coconut: 400, vanilla: 2,
@@ -490,6 +509,20 @@ export const VOLUME_ML: Record<string, number> = {
   pint: 473, pt: 473,
   // Everyday portions people type when logging ("1 bowl of dal").
   bowl: 250, glass: 250,
+  // Indian household measures.
+  katori: 150, tumbler: 200, ladle: 75,
+};
+
+/**
+ * "1 plate", "2 servings" — what one portion of a plain food weighs. A dish
+ * in DISHES uses its own serving weight instead. Only read when the measure
+ * has a number: "for serving" is a garnish, not 200 g.
+ */
+export const SERVING_UNITS: Record<string, number> = {
+  plate: 250,
+  serving: 200,
+  portion: 200,
+  helping: 200,
 };
 
 /** Units that are already weights, or fixed-size things. */
@@ -534,4 +567,281 @@ export const CONTEXT_UNITS: Record<string, { byFood: Record<string, number>; oth
   },
   cube: { byFood: { roux: 20, stock: 10, bouillon: 10 }, otherwise: 10 },
   sheet: { byFood: { nori: 3, lasagne: 20, lasagna: 20, pastry: 320, filo: 10, phyllo: 10 }, otherwise: 20 },
+};
+
+/**
+ * A prepared dish as people log it: per-100g as served, one serving's grams
+ * and, for things eaten by the piece, one piece's grams.
+ */
+export interface Dish {
+  per100: Per100g;
+  /** Grams in one plate/serving of the dish. */
+  serving: number;
+  /** Grams in one piece, for dishes counted in pieces ("3 idli"). */
+  piece?: number;
+  /** Grams per ml for cup/bowl/katori measures; 1 when unset. */
+  density?: number;
+  /** Ml in "a cup" of a drink served in a tea cup, not a 240 ml cup. */
+  cup?: number;
+}
+
+const d = (per100: Per100g, serving: number, extra: Omit<Dish, 'per100' | 'serving'> = {}): Dish => ({
+  per100,
+  serving,
+  ...extra,
+});
+
+/**
+ * Indian dishes as typed into the meal log or named by the photo scanner —
+ * consulted before STATIC/USDA, but only on those paths: a recipe line that
+ * says "rajma" means dry kidney beans, a typed "rajma" means the curry.
+ *
+ * Per-100g values are from the Indian Nutrient Databank (INDB — Vijayakumar
+ * et al., Curr Dev Nutr 2024, built on ICMR-NIN IFCT 2017) where its recipe is
+ * plausible. INDB counts the whole frying pot as eaten (poori 738 kcal/100 g)
+ * and dilutes drinks, so fried dishes, sweets in syrup and drinks use typical
+ * home values with ~15% absorbed oil instead; every entry passes the 4/4/9
+ * energy check in test/dishes.test.ts. Piece and serving weights are the
+ * usual home/restaurant sizes (an idli 40 g, a plate of upma 200 g).
+ */
+export const DISHES: Record<string, Dish> = {
+  // --- South Indian tiffin ------------------------------------------------
+  idli: d(m(138, 4.6, 28.2, 0.3), 80, { piece: 40 }),
+  'rava idli': d(m(206, 9.3, 33.7, 3.5), 90, { piece: 45 }),
+  dosa: d(m(170, 4, 28, 4.5), 90, { piece: 90 }),
+  dosai: d(m(170, 4, 28, 4.5), 90, { piece: 90 }),
+  'plain dosa': d(m(170, 4, 28, 4.5), 90, { piece: 90 }),
+  'masala dosa': d(m(165, 3.3, 19.6, 7.8), 200, { piece: 200 }),
+  'rava dosa': d(m(227, 7.3, 32.8, 7.1), 80, { piece: 80 }),
+  'neer dosa': d(m(150, 2.5, 30, 2), 100, { piece: 50 }),
+  'ragi dosa': d(m(150, 3.5, 25, 4), 80, { piece: 80 }),
+  pesarattu: d(m(190, 9, 25, 6), 100, { piece: 100 }),
+  uttapam: d(m(200, 5.5, 30, 6), 120, { piece: 120 }),
+  uthappam: d(m(200, 5.5, 30, 6), 120, { piece: 120 }),
+  appam: d(m(200, 3.5, 35, 5), 120, { piece: 60 }),
+  idiyappam: d(m(150, 2.5, 33, 0.5), 120, { piece: 40 }),
+  puttu: d(m(170, 3, 32, 3.5), 150),
+  vada: d(m(290, 11, 27, 15), 100, { piece: 50 }),
+  vadai: d(m(290, 11, 27, 15), 100, { piece: 50 }),
+  'medu vada': d(m(290, 11, 27, 15), 100, { piece: 50 }),
+  'dahi vada': d(m(150, 5, 18, 6.5), 200, { piece: 100 }),
+  'sabudana vada': d(m(320, 3, 40, 17), 100, { piece: 50 }),
+  upma: d(m(148, 3.3, 16.3, 7.5), 200, { density: 0.8 }),
+  uppittu: d(m(148, 3.3, 16.3, 7.5), 200, { density: 0.8 }),
+  'semiya upma': d(m(149, 3.1, 16.9, 7.4), 200, { density: 0.8 }),
+  'vermicelli upma': d(m(149, 3.1, 16.9, 7.4), 200, { density: 0.8 }),
+  pongal: d(m(160, 4.5, 22, 6), 200, { density: 0.9 }),
+  'ven pongal': d(m(160, 4.5, 22, 6), 200, { density: 0.9 }),
+  'sakkarai pongal': d(m(250, 3.5, 40, 8.5), 150, { density: 0.9 }),
+  'ragi mudde': d(m(110, 2.5, 24, 0.5), 150, { piece: 150 }),
+  // --- West & North Indian breakfast --------------------------------------
+  poha: d(m(181, 4.9, 21.5, 8.1), 180, { density: 0.6 }),
+  'kanda poha': d(m(181, 4.9, 21.5, 8.1), 180, { density: 0.6 }),
+  'sabudana khichdi': d(m(187, 2.7, 22.4, 10.1), 200, { density: 0.7 }),
+  dhokla: d(m(180, 7, 25, 6), 140, { piece: 35 }),
+  khaman: d(m(180, 7, 25, 6), 140, { piece: 35 }),
+  chilla: d(m(180, 9, 20, 7), 140, { piece: 70 }),
+  cheela: d(m(180, 9, 20, 7), 140, { piece: 70 }),
+  thepla: d(m(346, 9, 41.3, 15.9), 80, { piece: 40 }),
+  'puri bhaji': d(m(183, 4, 24, 8), 225),
+  'poori bhaji': d(m(183, 4, 24, 8), 225),
+  'misal pav': d(m(150, 6, 18, 6), 300),
+  // --- breads ---------------------------------------------------------------
+  roti: d(m(280, 9, 50, 4.5), 80, { piece: 40 }),
+  chapati: d(m(280, 9, 50, 4.5), 80, { piece: 40 }),
+  chapathi: d(m(280, 9, 50, 4.5), 80, { piece: 40 }),
+  chapatti: d(m(280, 9, 50, 4.5), 80, { piece: 40 }),
+  phulka: d(m(280, 9, 50, 4.5), 60, { piece: 30 }),
+  fulka: d(m(280, 9, 50, 4.5), 60, { piece: 30 }),
+  paratha: d(m(298, 5.1, 30.7, 16.9), 160, { piece: 80 }),
+  parantha: d(m(298, 5.1, 30.7, 16.9), 160, { piece: 80 }),
+  'aloo paratha': d(m(205, 3.7, 23.9, 10.2), 130, { piece: 130 }),
+  'gobi paratha': d(m(178, 3.7, 18.8, 9.5), 120, { piece: 120 }),
+  'paneer paratha': d(m(263, 8, 24.3, 14.6), 120, { piece: 120 }),
+  puri: d(m(350, 8, 45, 16), 75, { piece: 25 }),
+  poori: d(m(350, 8, 45, 16), 75, { piece: 25 }),
+  bhatura: d(m(330, 8, 47, 12), 140, { piece: 70 }),
+  bhature: d(m(330, 8, 47, 12), 140, { piece: 70 }),
+  naan: d(m(286, 8.1, 51.8, 5), 90, { piece: 90 }),
+  'butter naan': d(m(310, 8, 50, 8.5), 90, { piece: 90 }),
+  kulcha: d(m(290, 8, 50, 6), 90, { piece: 90 }),
+  pav: d(m(280, 9, 50, 4.5), 70, { piece: 35 }),
+  papad: d(m(371, 25, 60, 3.3), 12, { piece: 12 }),
+  // --- dals, curries, gravies ------------------------------------------------
+  dal: d(m(110, 5.5, 13, 4), 150),
+  daal: d(m(110, 5.5, 13, 4), 150),
+  dhal: d(m(110, 5.5, 13, 4), 150),
+  'dal tadka': d(m(110, 5.5, 13, 4), 150),
+  'dal fry': d(m(110, 5.5, 13, 4), 150),
+  'dal makhani': d(m(150, 6, 14, 8), 150),
+  sambar: d(m(97, 3.4, 10.6, 4.4), 150),
+  sambhar: d(m(97, 3.4, 10.6, 4.4), 150),
+  rasam: d(m(27, 1.1, 3.4, 0.9), 150),
+  rajma: d(m(144, 6, 16.4, 5.8), 150),
+  rajmah: d(m(144, 6, 16.4, 5.8), 150),
+  chole: d(m(150, 6.5, 18, 6), 150),
+  chhole: d(m(150, 6.5, 18, 6), 150),
+  'chana masala': d(m(150, 6.5, 18, 6), 150),
+  'chole bhature': d(m(237, 7, 33, 9), 290),
+  kadhi: d(m(115, 4, 9, 7), 150),
+  'kadhi pakora': d(m(115, 4, 9, 7), 150),
+  'palak paneer': d(m(160, 8, 6, 12), 150),
+  'paneer butter masala': d(m(220, 8, 9, 17), 150),
+  'shahi paneer': d(m(230, 8, 9, 18), 150),
+  'matar paneer': d(m(135, 6.6, 9.3, 7.8), 150),
+  'kadai paneer': d(m(190, 9, 8, 14), 150),
+  'paneer tikka': d(m(250, 15, 6, 18), 150),
+  'paneer bhurji': d(m(250, 14, 6, 19), 150),
+  'malai kofta': d(m(230, 5, 14, 17), 150),
+  'aloo gobi': d(m(106, 1.9, 6, 8.1), 150),
+  'aloo matar': d(m(101, 3.5, 9.7, 5.1), 150),
+  'aloo sabzi': d(m(103, 1.6, 14.4, 4.2), 150),
+  'aloo bhaji': d(m(103, 1.6, 14.4, 4.2), 150),
+  'jeera aloo': d(m(103, 1.6, 14.4, 4.2), 150),
+  'dum aloo': d(m(140, 2, 15, 8), 150),
+  'bhindi masala': d(m(111, 1.8, 4.5, 9.3), 150),
+  'baingan bharta': d(m(100, 2, 8, 7), 150),
+  sabzi: d(m(100, 2.5, 9, 6), 150),
+  sabji: d(m(100, 2.5, 9, 6), 150),
+  'mixed veg': d(m(100, 2.5, 9, 6), 150),
+  poriyal: d(m(110, 3, 9, 7), 120),
+  thoran: d(m(110, 3, 9, 7), 120),
+  kootu: d(m(100, 4, 10, 5), 150),
+  avial: d(m(120, 2.5, 8, 9), 150),
+  kurma: d(m(130, 3, 10, 9), 150),
+  korma: d(m(130, 3, 10, 9), 150),
+  'pav bhaji': d(m(150, 4, 20, 6), 280),
+  // --- meat, egg, fish ---------------------------------------------------------
+  'chicken curry': d(m(129, 11.8, 3.4, 7.6), 200),
+  'butter chicken': d(m(190, 12, 6, 13), 200),
+  'chicken tikka masala': d(m(170, 13, 6, 10.5), 200),
+  'chicken tikka': d(m(160, 25, 3, 5.5), 150),
+  'tandoori chicken': d(m(165, 25, 2, 6.5), 200),
+  'chicken 65': d(m(240, 20, 8, 14), 150),
+  'chilli chicken': d(m(200, 16, 9, 11), 200),
+  'chicken chettinad': d(m(170, 15, 4, 10.5), 200),
+  'mutton curry': d(m(190, 14, 4, 13), 200),
+  'rogan josh': d(m(190, 14, 4, 13), 200),
+  keema: d(m(200, 15, 5, 13.5), 150),
+  'egg curry': d(m(118, 5.4, 4, 8.8), 200),
+  'egg bhurji': d(m(175, 11, 4, 13), 150),
+  omelette: d(m(165, 11, 3, 12.5), 120, { piece: 120 }),
+  omelet: d(m(165, 11, 3, 12.5), 120, { piece: 120 }),
+  'fish curry': d(m(111, 8.8, 3.8, 6.7), 200),
+  'fish fry': d(m(220, 22, 6, 12), 120, { piece: 60 }),
+  'prawn curry': d(m(120, 12, 4, 6.5), 200),
+  'prawn masala': d(m(120, 12, 4, 6.5), 200),
+  // --- rice ----------------------------------------------------------------------
+  biryani: d(m(170, 8.5, 21, 6), 300, { density: 0.8 }),
+  biriyani: d(m(170, 8.5, 21, 6), 300, { density: 0.8 }),
+  'chicken biryani': d(m(170, 8.5, 21, 6), 300, { density: 0.8 }),
+  'mutton biryani': d(m(191, 7.4, 22.5, 7.7), 300, { density: 0.8 }),
+  'veg biryani': d(m(175, 3.2, 18.6, 9.5), 300, { density: 0.8 }),
+  'vegetable biryani': d(m(175, 3.2, 18.6, 9.5), 300, { density: 0.8 }),
+  'egg biryani': d(m(165, 6.5, 21, 6), 300, { density: 0.8 }),
+  pulao: d(m(130, 2.7, 20, 4.2), 250, { density: 0.8 }),
+  pulav: d(m(130, 2.7, 20, 4.2), 250, { density: 0.8 }),
+  'jeera rice': d(m(150, 2.6, 26, 4), 200, { density: 0.8 }),
+  'lemon rice': d(m(176, 4.3, 21.6, 7.9), 200, { density: 0.8 }),
+  'curd rice': d(m(150, 4.5, 24, 4), 200, { density: 0.9 }),
+  'tamarind rice': d(m(180, 3.5, 28, 6), 200, { density: 0.8 }),
+  pulihora: d(m(180, 3.5, 28, 6), 200, { density: 0.8 }),
+  puliyogare: d(m(180, 3.5, 28, 6), 200, { density: 0.8 }),
+  'tomato rice': d(m(160, 3, 26, 5), 200, { density: 0.8 }),
+  'coconut rice': d(m(190, 3, 27, 8), 200, { density: 0.8 }),
+  'bisi bele bath': d(m(140, 4.5, 20, 4.5), 250, { density: 0.9 }),
+  'sambar rice': d(m(130, 4, 21, 3.5), 250, { density: 0.9 }),
+  'fried rice': d(m(170, 4, 26, 5.5), 250, { density: 0.8 }),
+  khichdi: d(m(143, 5.6, 19.6, 4.5), 250, { density: 0.9 }),
+  khichri: d(m(143, 5.6, 19.6, 4.5), 250, { density: 0.9 }),
+  'rajma chawal': d(m(136, 4.8, 22, 3.2), 350),
+  'dal chawal': d(m(125, 4, 21, 2.5), 350),
+  'dal rice': d(m(125, 4, 21, 2.5), 350),
+  'chole chawal': d(m(140, 4.5, 22, 3.5), 350),
+  thali: d(m(145, 4.5, 20, 5.5), 600),
+  // --- sides & condiments --------------------------------------------------------
+  raita: d(m(59, 4, 6.3, 2.1), 100),
+  'boondi raita': d(m(110, 4, 10, 6), 100),
+  curd: d(m(61, 3.5, 4.7, 3.3), 100),
+  dahi: d(m(61, 3.5, 4.7, 3.3), 100),
+  chutney: d(m(150, 2.5, 10, 11), 30),
+  'coconut chutney': d(m(266, 3.6, 8.3, 25), 30),
+  'tomato chutney': d(m(80, 1.5, 9, 4.5), 30),
+  'peanut chutney': d(m(258, 11.8, 9.9, 19.1), 30),
+  pickle: d(m(250, 2, 10, 23), 15),
+  achar: d(m(250, 2, 10, 23), 15),
+  'sprouts salad': d(m(80, 5.5, 12, 1.2), 150),
+  // --- snacks & street food -------------------------------------------------------
+  samosa: d(m(290, 5, 32, 16), 90, { piece: 90 }),
+  kachori: d(m(400, 8, 42, 22), 50, { piece: 50 }),
+  pakora: d(m(300, 7, 28, 18), 100, { piece: 20 }),
+  pakoda: d(m(300, 7, 28, 18), 100, { piece: 20 }),
+  bhajji: d(m(300, 7, 28, 18), 100, { piece: 25 }),
+  bajji: d(m(300, 7, 28, 18), 100, { piece: 25 }),
+  'onion bhaji': d(m(300, 7, 28, 18), 100, { piece: 25 }),
+  'vada pav': d(m(195, 5, 27, 7.5), 150, { piece: 150 }),
+  'batata vada': d(m(250, 4, 30, 13), 70, { piece: 70 }),
+  'aloo tikki': d(m(200, 3, 25, 10), 120, { piece: 60 }),
+  'pani puri': d(m(150, 3, 25, 4.5), 120, { piece: 20 }),
+  golgappa: d(m(150, 3, 25, 4.5), 120, { piece: 20 }),
+  'bhel puri': d(m(180, 4.5, 30, 5), 150),
+  bhel: d(m(180, 4.5, 30, 5), 150),
+  'sev puri': d(m(220, 5, 28, 10), 150),
+  'dahi puri': d(m(220, 5, 28, 10), 150),
+  'papdi chaat': d(m(200, 5, 28, 7.5), 150),
+  chaat: d(m(200, 5, 28, 7.5), 150),
+  'samosa chaat': d(m(210, 6, 27, 9), 200),
+  sev: d(m(530, 15, 45, 32), 30),
+  namkeen: d(m(520, 12, 45, 32), 30),
+  mixture: d(m(520, 12, 45, 32), 30),
+  murukku: d(m(520, 9, 55, 29), 30, { piece: 15 }),
+  chakli: d(m(520, 9, 55, 29), 30, { piece: 15 }),
+  maggi: d(m(140, 3, 19, 5.5), 220, { piece: 220 }),
+  momos: d(m(200, 8, 26, 7), 150, { piece: 25 }),
+  momo: d(m(200, 8, 26, 7), 150, { piece: 25 }),
+  'kathi roll': d(m(240, 9, 28, 10), 180, { piece: 180 }),
+  frankie: d(m(240, 9, 28, 10), 180, { piece: 180 }),
+  manchurian: d(m(180, 4, 20, 9.5), 200),
+  'hakka noodles': d(m(170, 4, 25, 6), 250),
+  // --- sweets ------------------------------------------------------------------------
+  'gulab jamun': d(m(320, 4, 50, 12), 100, { piece: 50 }),
+  jalebi: d(m(400, 2, 60, 17), 75, { piece: 25 }),
+  rasgulla: d(m(186, 4, 39, 2), 100, { piece: 50 }),
+  rasagulla: d(m(186, 4, 39, 2), 100, { piece: 50 }),
+  rasmalai: d(m(190, 6, 24, 8), 120, { piece: 60 }),
+  kheer: d(m(140, 4, 21, 4.5), 150),
+  payasam: d(m(140, 4, 21, 4.5), 150),
+  halwa: d(m(226, 2.2, 24.7, 13.4), 125),
+  sheera: d(m(226, 2.2, 24.7, 13.4), 125),
+  kesari: d(m(226, 2.2, 24.7, 13.4), 125),
+  'gajar halwa': d(m(173, 3.1, 18.5, 9.7), 125),
+  ladoo: d(m(477, 8.9, 62.6, 22.8), 35, { piece: 35 }),
+  laddoo: d(m(477, 8.9, 62.6, 22.8), 35, { piece: 35 }),
+  laddu: d(m(477, 8.9, 62.6, 22.8), 35, { piece: 35 }),
+  'rava ladoo': d(m(464, 5.7, 50.9, 27), 35, { piece: 35 }),
+  'kaju katli': d(m(450, 10, 55, 22), 30, { piece: 15 }),
+  barfi: d(m(400, 9, 50, 18), 30, { piece: 30 }),
+  burfi: d(m(400, 9, 50, 18), 30, { piece: 30 }),
+  'mysore pak': d(m(560, 6, 45, 40), 30, { piece: 30 }),
+  // --- drinks --------------------------------------------------------------------------
+  chai: d(m(55, 1.6, 7.5, 2), 150, { cup: 150 }),
+  tea: d(m(55, 1.6, 7.5, 2), 150, { cup: 150 }),
+  'masala chai': d(m(55, 1.6, 7.5, 2), 150, { cup: 150 }),
+  'black tea': d(m(1, 0, 0, 0), 200),
+  'green tea': d(m(1, 0, 0, 0), 200),
+  'lemon tea': d(m(30, 0, 8, 0), 150, { cup: 150 }),
+  coffee: d(m(60, 2.2, 7, 2.5), 150, { cup: 150 }),
+  'filter coffee': d(m(60, 2.2, 7, 2.5), 150, { cup: 150 }),
+  'black coffee': d(m(2, 0.3, 0, 0), 200),
+  'cold coffee': d(m(85, 2.5, 12, 3), 250),
+  lassi: d(m(85, 3, 13, 2.5), 250),
+  'sweet lassi': d(m(85, 3, 13, 2.5), 250),
+  'mango lassi': d(m(100, 2.5, 17, 2.5), 250),
+  'salted lassi': d(m(25, 1.5, 2.5, 1), 200),
+  chaas: d(m(25, 1.5, 2.5, 1), 200),
+  chhaas: d(m(25, 1.5, 2.5, 1), 200),
+  buttermilk: d(m(25, 1.5, 2.5, 1), 200),
+  'badam milk': d(m(110, 4, 14, 4.5), 200),
+  'nimbu pani': d(m(30, 0, 8, 0), 250),
+  'coconut water': d(m(19, 0.7, 3.7, 0.2), 250),
 };

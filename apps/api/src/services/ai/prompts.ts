@@ -1,3 +1,5 @@
+import { DISHES } from '../nutritionTables.js';
+
 export const RECIPE_SYSTEM =
   'You are a recipe API. Respond with ONLY minified valid JSON. No markdown, no code fences, no commentary.';
 
@@ -6,10 +8,12 @@ export function recipeUserPrompt(query: string): string {
     `Create a recipe for "${query}". Respond with a single JSON object matching this schema:\n` +
     `{"name":string,"category":string,"cuisine":string,` +
     `"ingredients":[{"name":string,"measure":string}],` +
-    `"instructions":string,"prepMinutes":number,"cookMinutes":number}\n` +
+    `"instructions":string,"prepMinutes":number,"cookMinutes":number,"servings":number}\n` +
     `Rules: 8-16 ingredients with realistic measures (e.g. "200 g", "1 tbsp"); ` +
     `instructions as plain-text paragraphs separated by \\n\\n; ` +
-    `prepMinutes and cookMinutes are integers.`
+    `prepMinutes and cookMinutes are integers; servings is how many people ` +
+    `these quantities feed (an integer, 1-16). For deep frying, list the oil ` +
+    `as the amount in the pan (e.g. "500 ml") — never "for frying".`
   );
 }
 
@@ -106,20 +110,31 @@ export const VISION_SYSTEM =
   'photograph of a meal. Respond with ONLY minified valid JSON — no markdown, ' +
   'no code fences, no commentary.';
 
+// Names the nutrition tables know, so the model's labels land on real table
+// rows instead of near-misses ("steamed rice cake" for idli).
+const DISH_NAMES = Object.keys(DISHES).join(', ');
+
 export function visionUserPrompt(): string {
   return (
     'Identify the meal in this photo and estimate its nutrition as eaten ' +
     '(the whole portion shown, not per 100 g). Respond with one JSON object:\n' +
-    '{"name":string,"confidence":number,"items":[{"name":string,"grams":number}],' +
+    '{"name":string,"confidence":number,"items":[{"name":string,"grams":number,"count":number,' +
+    '"calories":number,"protein":number,"carbs":number,"fat":number}],' +
     '"calories":number,"protein":number,"carbs":number,"fat":number,"note":string}\n' +
     'Rules: name the dish the way a cook would ("Masala dosa with sambar", ' +
     'not "flatbread"); confidence is your own 0-1 certainty; list every ' +
-    'component you can see with a realistic gram weight; calories/protein/' +
-    'carbs/fat are integers for the whole plate and must be consistent with ' +
-    'the item weights; note is one short sentence naming the biggest source ' +
-    'of uncertainty (hidden oil, unknown portion depth, sauce). ' +
-    'If the photo is not food, set name to "Not a meal", confidence to 0 and ' +
-    'every number to 0.'
+    'component you can see as its own item with a realistic gram weight — ' +
+    'the dosa, the sambar and the chutney are three items. For things eaten ' +
+    'by the piece (idli, dosa, vada, roti, puri, samosa, egg) also give count. ' +
+    'Indian home portions: one idli is about 40 g, a roti 40 g, a katori of ' +
+    'dal or sambar 150 g, a plate of rice 250 g. When an item is one of these, ' +
+    `use exactly this name: ${DISH_NAMES}. ` +
+    'Item and total calories/protein/carbs/fat are for the amount shown and ' +
+    'the totals are integers equal to the sum of the items; note is one short ' +
+    'sentence naming the biggest source of uncertainty (hidden oil, unknown ' +
+    'portion depth, sauce). ' +
+    'If the photo is not food, set name to "Not a meal", confidence to 0, ' +
+    'items to [] and every number to 0.'
   );
 }
 
@@ -129,23 +144,35 @@ export function visionUserPrompt(): string {
 
 export const LABEL_SYSTEM =
   'You are an OCR and nutrition-label reading API. You receive one photograph ' +
-  'of a packaged food\'s Nutrition Facts panel. Respond with ONLY minified ' +
+  "of a packaged food's nutrition panel (a US Nutrition Facts panel or an " +
+  'Indian/FSSAI "Nutritional Information" table). Respond with ONLY minified ' +
   'valid JSON — no markdown, no code fences, no commentary.';
 
-export function labelUserPrompt(): string {
+/** `ocrText` = what the phone's own OCR read off the photo, when it ran. */
+export function labelUserPrompt(ocrText?: string): string {
   return (
-    'Read the Nutrition Facts panel in this photo exactly as printed — do not ' +
+    'Read the nutrition panel in this photo exactly as printed — do not ' +
     'estimate or round beyond what is shown. Respond with one JSON object:\n' +
     '{"productName":string,"servingSize":string,"servingsPerContainer":number,' +
-    '"calories":number,"protein":number,"carbs":number,"fat":number,"note":string}\n' +
+    '"calories":number,"protein":number,"carbs":number,"fat":number,' +
+    '"per100g":{"calories":number,"protein":number,"carbs":number,"fat":number},' +
+    '"servingGrams":number,"packGrams":number,"note":string}\n' +
     'Rules: productName is the brand/product name on the package if visible, ' +
-    'else a plain description ("Granola bar"); servingSize is the label text ' +
-    'verbatim ("2 cookies (30g)"); servingsPerContainer is the number printed ' +
-    'on the label (omit the field if not shown); calories/protein/carbs/fat ' +
-    'are the per-serving integers printed on the panel, never per 100g and ' +
-    'never per container; note is one short sentence flagging anything hard ' +
-    'to read (glare, cropped edge, blurry print). ' +
-    'If no Nutrition Facts panel is visible in the photo, set productName to ' +
+    'else a plain description ("Granola bar"); servingSize is the serving ' +
+    'text verbatim ("2 cookies (30g)", "Per serve 30 g"); servingGrams is that ' +
+    'serving in grams; calories/protein/carbs/fat are the per-serving ' +
+    'integers. Many Indian labels print a "per 100 g" column: copy it into ' +
+    'per100g. If the label prints ONLY per 100 g, set servingSize to "100 g", ' +
+    'servingGrams to 100 and the per-serving numbers to the per-100 g ones. ' +
+    'Energy printed only in kJ is divided by 4.184. packGrams is the net ' +
+    'weight; omit servingsPerContainer, per100g, servingGrams or packGrams ' +
+    'when not printed. note is one short sentence flagging anything hard to ' +
+    'read (glare, cropped edge, blurry print). ' +
+    (ocrText
+      ? 'The phone\'s OCR read this text from the same photo — trust its ' +
+        `digits where the image is unclear:\n"""\n${ocrText}\n"""\n`
+      : '') +
+    'If no nutrition panel is visible in the photo, set productName to ' +
     '"No label found", servingSize to "" and every number to 0.'
   );
 }

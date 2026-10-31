@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -10,16 +11,27 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  GROCERY_STORES,
+  shoppingQuery,
+  type GroceryItem,
+  type GroceryStore,
+  type GroceryStoreId,
+} from '@nutrichef/shared';
 import { colors } from '../theme/colors';
 import { SCREEN_PADDING, fonts, radii, type } from '../theme/typography';
 import { FadeIn, PressableScale, ProgressBar, spring } from '../theme/motion';
 import { Screen } from '../components/Screen';
 import { Card } from '../components/Card';
 import { EmptyState, ErrorState } from '../components/States';
+import { BottomSheet } from '../components/BottomSheet';
 import { useGrocery } from '../hooks/useGrocery';
-import type { GroceryItem } from '@nutrichef/shared';
 
 const OTHER_GROUP = '__other__';
+// The store picked last time is offered first. A per-device convenience, so
+// AsyncStorage rather than the profile.
+const STORE_KEY = 'grocery.lastStore';
 
 /** Items keep server order (createdAt asc); groups take the position of
  *  their first item, with ungrouped manual entries always trailing. */
@@ -41,6 +53,31 @@ function groupByRecipe(items: GroceryItem[]) {
 export function GroceryScreen() {
   const [text, setText] = useState('');
   const { list, add, toggle, remove } = useGrocery();
+  const [buying, setBuying] = useState<GroceryItem | null>(null);
+  const [lastStore, setLastStore] = useState<GroceryStoreId | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORE_KEY)
+      .then((id) => GROCERY_STORES.some((s) => s.id === id) && setLastStore(id as GroceryStoreId))
+      .catch(() => {});
+  }, []);
+
+  // Opens the store's own app when installed (universal link), else its site.
+  async function buyAt(store: GroceryStore, item: GroceryItem) {
+    setBuying(null);
+    setLastStore(store.id);
+    AsyncStorage.setItem(STORE_KEY, store.id).catch(() => {});
+    try {
+      await Linking.openURL(store.searchUrl(shoppingQuery(item.name)));
+      setOpenError(null);
+    } catch {
+      setOpenError(`Couldn't open ${store.name}. Try again or pick another store.`);
+    }
+  }
+  const stores = lastStore
+    ? [...GROCERY_STORES].sort((a, b) => (a.id === lastStore ? -1 : b.id === lastStore ? 1 : 0))
+    : GROCERY_STORES;
 
   const submit = () => {
     const name = text.trim();
@@ -109,6 +146,16 @@ export function GroceryScreen() {
             </PressableScale>
           </FadeIn>
 
+          {items.some((i) => !i.checked) && (
+            <FadeIn delay={90}>
+              <Text style={[type.caption, styles.hint]}>
+                Tap <Ionicons name="bag-handle-outline" size={13} color={colors.textSecondary} /> to
+                buy an item on Blinkit, Zepto or Instamart, then tick it off.
+              </Text>
+            </FadeIn>
+          )}
+          {openError && <Text style={styles.error}>{openError}</Text>}
+
           {list.isError ? (
             <ErrorState onRetry={() => list.refetch()} />
           ) : items.length === 0 ? (
@@ -134,9 +181,27 @@ export function GroceryScreen() {
                         >
                           <Checkbox checked={item.checked} />
                         </PressableScale>
-                        <Text style={[type.body, styles.flex1, item.checked && styles.rowDone]}>
-                          {item.name}
-                        </Text>
+                        <View style={styles.flex1}>
+                          <Text style={[type.body, item.checked && styles.rowDone]}>{item.name}</Text>
+                          {item.quantity ? (
+                            <Text style={[type.caption, styles.quantity]} numberOfLines={1}>
+                              {item.quantity}
+                            </Text>
+                          ) : null}
+                        </View>
+                        {!item.checked && (
+                          <PressableScale
+                            onPress={() => setBuying(item)}
+                            scaleTo={0.85}
+                            haptic
+                            hitSlop={8}
+                            style={styles.buyButton}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Buy ${item.name}`}
+                          >
+                            <Ionicons name="bag-handle-outline" size={18} color={colors.primary} />
+                          </PressableScale>
+                        )}
                         <PressableScale
                           onPress={() => remove.mutate(item.id)}
                           scaleTo={0.85}
@@ -155,6 +220,38 @@ export function GroceryScreen() {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <BottomSheet
+        visible={buying != null}
+        title={buying ? `Buy ${shoppingQuery(buying.name)}` : ''}
+        subtitle={
+          buying?.quantity
+            ? `Recipe needs ${buying.quantity}. Opens the store's app, or its website if the app isn't installed.`
+            : "Opens the store's app, or its website if the app isn't installed."
+        }
+        onClose={() => setBuying(null)}
+      >
+        <View style={styles.storeList}>
+          {stores.map((store) => (
+            <PressableScale
+              key={store.id}
+              onPress={() => buying && buyAt(store, buying)}
+              haptic
+              scaleTo={0.97}
+              style={styles.storeRow}
+              accessibilityRole="button"
+              accessibilityLabel={`Search ${store.name}`}
+            >
+              <View style={[styles.storeSwatch, { backgroundColor: store.color }]}>
+                <Text style={[styles.storeInitial, { color: store.ink }]}>{store.name[0]}</Text>
+              </View>
+              <Text style={[type.cardTitle, styles.flex1]}>{store.name}</Text>
+              {store.id === lastStore && <Text style={styles.lastUsed}>Last used</Text>}
+              <Ionicons name="open-outline" size={18} color={colors.textTertiary} />
+            </PressableScale>
+          ))}
+        </View>
+      </BottomSheet>
     </Screen>
   );
 }
@@ -229,6 +326,38 @@ const styles = StyleSheet.create({
   },
   rowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
   rowDone: { textDecorationLine: 'line-through', color: colors.textSecondary },
+  quantity: { marginTop: 2 },
+  hint: { paddingHorizontal: 4, lineHeight: 19 },
+  error: { fontFamily: fonts.medium, fontSize: 13, color: colors.danger, paddingHorizontal: 4 },
+  buyButton: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.pill,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  storeList: { gap: 10 },
+  storeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 14,
+    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  storeSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storeInitial: { fontFamily: fonts.bold, fontSize: 17 },
+  lastUsed: { fontFamily: fonts.semibold, fontSize: 11, color: colors.success },
 
   checkbox: {
     width: 24,

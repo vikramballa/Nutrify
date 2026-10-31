@@ -8,6 +8,7 @@ import {
   PantryIdeaSchema,
   PantryRequestSchema,
   computeGoals,
+  macrosConsistent,
   type NutritionGoals,
 } from '@nutrichef/shared';
 import { z } from 'zod';
@@ -29,6 +30,7 @@ import {
 } from '../services/ai/prompts.js';
 import { adherenceScore, computeDailyTotals, dayRange } from '../services/tracking.js';
 import { logEvent } from '../services/taste.js';
+import { priceMealPhoto } from '../services/mealPhoto.js';
 
 /** ~1.4 MB of base64 ≈ a 1 MB JPEG — above that the model call is not worth it. */
 const MAX_IMAGE_CHARS = 1_400_000;
@@ -80,6 +82,8 @@ export async function assistantRoutes(app: FastifyInstance) {
   /**
    * Meal photo → dish name + per-plate macros. Nothing is logged here: the app
    * shows the estimate, lets the user correct it, then posts to /logs/custom.
+   * The model names the items and amounts; priceMealPhoto puts the numbers
+   * through the nutrition tables wherever it recognises the item.
    */
   app.post<{ Body: { image?: string } }>(
     '/vision/meal',
@@ -104,7 +108,7 @@ export async function assistantRoutes(app: FastifyInstance) {
           return reply.code(422).send({ error: 'not_a_meal' });
         }
         logEvent(req.userId, 'search', { term: data.name });
-        return { ...data, provider };
+        return { ...(await priceMealPhoto(data)), provider };
       } catch (err) {
         return sendAiError(reply, err);
       }
@@ -129,7 +133,7 @@ export async function assistantRoutes(app: FastifyInstance) {
       try {
         const { data, provider } = await aiJson(NutritionLabelAnalysisSchema, {
           system: LABEL_SYSTEM,
-          user: labelUserPrompt(),
+          user: labelUserPrompt(parsed.data.ocrText),
           image: parsed.data.image,
           maxTokens: 500,
         });
@@ -137,7 +141,11 @@ export async function assistantRoutes(app: FastifyInstance) {
           return reply.code(422).send({ error: 'no_label_found' });
         }
         logEvent(req.userId, 'search', { term: data.productName });
-        return { ...data, provider };
+        // A misread digit shows up as energy that 4/4/9 can't explain.
+        const note = macrosConsistent(data)
+          ? data.note
+          : 'These numbers do not add up — check them against the label before logging.';
+        return { ...data, note, provider, source: 'ai' as const };
       } catch (err) {
         return sendAiError(reply, err);
       }

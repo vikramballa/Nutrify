@@ -30,13 +30,17 @@ export function useAnalyzeMealPhoto() {
 const LabelResponseSchema = NutritionLabelAnalysisSchema.extend({ provider: z.string() });
 export type NutritionLabelAnalysisResult = z.infer<typeof LabelResponseSchema>;
 
-/** Nutrition Facts panel photo (data URL) → per-serving macros read off the label. */
+/**
+ * Nutrition label photo (data URL) → macros read off the label by the model.
+ * `ocrText` is what on-device OCR read but couldn't parse; it helps the
+ * model with digits the photo blurs.
+ */
 export function useAnalyzeNutritionLabel() {
-  return useMutation<NutritionLabelAnalysisResult, ApiError, string>({
-    mutationFn: async (image) =>
+  return useMutation<NutritionLabelAnalysisResult, ApiError, { image: string; ocrText?: string }>({
+    mutationFn: async (input) =>
       parseWith(
         LabelResponseSchema,
-        await apiFetch('/vision/label', { method: 'POST', body: JSON.stringify({ image }) }),
+        await apiFetch('/vision/label', { method: 'POST', body: JSON.stringify(input) }),
         'vision/label',
       ),
     retry: false,

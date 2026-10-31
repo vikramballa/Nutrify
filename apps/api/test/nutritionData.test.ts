@@ -4,6 +4,7 @@ import {
   forState,
   measureToGrams,
   pickUsdaFood,
+  recipeNutrition,
   resolveMeasure,
   staticLookup,
   usdaMacros,
@@ -210,5 +211,101 @@ describe('usdaMacros', () => {
 
   it('computes energy from macros when none is reported', () => {
     expect(usdaMacros({ foodNutrients: [n('203', 22.6), n('205', 1.9), n('204', 32.6)] })?.calories).toBe(391);
+  });
+});
+
+describe('recipeNutrition', () => {
+  // Per-100g straight from the static table, as ingredientsPer100g would give.
+  const lookupFor = (names: string[]) =>
+    new Map(names.map((n) => [n.trim().toLowerCase(), staticLookup(n)]));
+  const run = (r: Parameters<typeof recipeNutrition>[0]) =>
+    recipeNutrition(r, lookupFor(r.ingredients.map((i) => i.name)))!;
+
+  it('keeps the water a pinch of dal could not absorb', () => {
+    const upma = run({
+      name: 'Rava Upma',
+      category: 'Breakfast',
+      ingredients: [
+        { name: 'Semolina (rava)', measure: '1 cup' },
+        { name: 'Urad dal', measure: '1 tsp' },
+        { name: 'Water', measure: '2.5 cups' },
+        { name: 'Ghee', measure: '2 tbsp' },
+      ],
+    });
+    // Was 1 serving of 917 kcal: the teaspoon of dal cancelled all the water.
+    expect(upma.servings).toBeGreaterThanOrEqual(2);
+    expect(upma.calories).toBeLessThan(450);
+  });
+
+  it('counts 15% of a frying pot, desserts that fry included', () => {
+    const jalebi = run({
+      name: 'Jalebi',
+      category: 'Dessert',
+      instructions: 'Pipe spiral coils into hot oil. Fry for 2 minutes until crisp.',
+      declaredServings: 8,
+      ingredients: [
+        { name: 'Flour', measure: '1 cup' },
+        { name: 'Sugar', measure: '1.5 cups' },
+        { name: 'Water', measure: '3/4 cup' },
+        { name: 'Oil', measure: '500 ml' },
+      ],
+    });
+    // 500 ml oil → 69 g eaten, syrup half eaten: ~1300 kcal over 8.
+    expect(jalebi.calories).toBeGreaterThan(130);
+    expect(jalebi.calories).toBeLessThan(220);
+  });
+
+  it('counts all the oil in a cake that is baked', () => {
+    const lines = [
+      { name: 'Vegetable Oil', measure: '450ml' },
+      { name: 'Plain Flour', measure: '400g' },
+    ];
+    const baked = run({ name: 'Carrot Cake', category: 'Dessert', instructions: 'Bake for 40 minutes.', declaredServings: 16, ingredients: lines });
+    // 414 g oil + 400 g flour ≈ 5100 kcal over 16.
+    expect(baked.calories).toBeGreaterThan(300);
+  });
+
+  it('believes a declared serving count over the weight estimate', () => {
+    const r = run({
+      name: 'Idli',
+      category: 'Breakfast',
+      declaredServings: 7,
+      ingredients: [
+        { name: 'Idli rice', measure: '2 cups' },
+        { name: 'Urad dal', measure: '1/2 cup' },
+      ],
+    });
+    expect(r.servings).toBe(7);
+    expect(r.servingGrams).toBeGreaterThan(100);
+  });
+
+  it('weighs meat raw in recipes and cooked in typed logs', () => {
+    const chicken = staticLookup('chicken')!;
+    expect(forState('Chicken thighs', '800 g', chicken, 'dry').calories).toBe(150);
+    expect(forState('chicken', '200g', chicken, 'cooked').calories).toBe(200);
+    const curry = run({
+      name: 'Mutton Rogan Josh',
+      category: 'Dinner',
+      declaredServings: 4,
+      ingredients: [
+        { name: 'Mutton', measure: '750 g' },
+        { name: 'Yogurt', measure: '1 cup' },
+        { name: 'Oil', measure: '4 tbsp' },
+      ],
+    });
+    // Cooked-meat values on the raw 750 g made it 62 g a serving.
+    expect(curry.protein).toBeLessThan(45);
+  });
+});
+
+describe('portions by dish name', () => {
+  it('only treats a name ending in a bread word as bread', () => {
+    expect(estimateServings(2700, 'Lunch', 'Pav Bhaji')).toBe(8); // 350 g, not 16 × 90 g
+    expect(estimateServings(1100, 'Breakfast', 'Aloo Paratha')).toBe(12);
+  });
+
+  it('portions chutneys and raitas as sides on the plate', () => {
+    expect(estimateServings(240, 'Side', 'Coconut Chutney')).toBe(6);
+    expect(estimateServings(500, 'Side', 'Boondi Raita')).toBe(4);
   });
 });

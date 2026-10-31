@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { GroceryFromRecipeRequestSchema } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
 import { logEvent } from '../services/taste.js';
 import { missingIngredientNames } from '../services/mealplan.js';
@@ -9,8 +10,16 @@ export function groceryDTO(i: {
   checked: boolean;
   recipeId: string | null;
   recipeName: string | null;
+  quantity: string | null;
 }) {
-  return { id: i.id, name: i.name, checked: i.checked, recipeId: i.recipeId, recipeName: i.recipeName };
+  return {
+    id: i.id,
+    name: i.name,
+    checked: i.checked,
+    recipeId: i.recipeId,
+    recipeName: i.recipeName,
+    quantity: i.quantity,
+  };
 }
 
 export async function groceryRoutes(app: FastifyInstance) {
@@ -34,36 +43,53 @@ export async function groceryRoutes(app: FastifyInstance) {
     return groceryDTO(item);
   });
 
-  // Adds every ingredient of one recipe in a single call, tagging each item
-  // with the recipe so the list can group by it, and skipping names already
-  // on the list (case-insensitive) so re-tapping "Shop" doesn't duplicate.
-  app.post<{ Body: { recipeId?: string } }>('/grocery/from-recipe', async (req, reply) => {
-    const recipeId = (req.body?.recipeId ?? '').trim();
-    if (!recipeId) return reply.code(400).send({ error: 'recipe_id_required' });
+  // Adds a recipe's ingredients in one call — all of them, or just the ones the
+  // user marked as missing (`names`). Each item is tagged with the recipe so
+  // the list can group by it and carries the recipe's quantity, read from the
+  // stored recipe rather than trusted from the client. Names already on the
+  // list (case-insensitive) are skipped so re-tapping "Shop" doesn't duplicate.
+  app.post('/grocery/from-recipe', async (req, reply) => {
+    const parsed = GroceryFromRecipeRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const hasId = typeof (req.body as { recipeId?: unknown } | null)?.recipeId === 'string';
+      return reply.code(400).send({ error: hasId ? 'invalid_names' : 'recipe_id_required' });
+    }
+    const { recipeId, names } = parsed.data;
     const recipe = await prisma.recipe.findUnique({
       where: { id: recipeId },
-      select: { name: true, ingredients: { select: { name: true } } },
+      select: { name: true, ingredients: { select: { name: true, measure: true }, orderBy: { position: 'asc' } } },
     });
     if (!recipe) return reply.code(404).send({ error: 'recipe_not_found' });
 
-    const needed = recipe.ingredients.map((i) => i.name);
+    const wanted = names && new Set(names.map((n) => n.trim().toLowerCase()));
+    const chosen = recipe.ingredients.filter((i) => !wanted || wanted.has(i.name.trim().toLowerCase()));
+    const measureOf = new Map(chosen.map((i) => [i.name.trim().toLowerCase(), i.measure.trim()]));
     const existing = await prisma.groceryItem.findMany({
       where: { userId: req.userId },
       select: { name: true },
       take: 500,
     });
-    const missing = missingIngredientNames(existing.map((i) => i.name), needed);
+    const missing = missingIngredientNames(
+      existing.map((i) => i.name),
+      chosen.map((i) => i.name),
+    );
     if (missing.length > 0) {
       for (const name of missing) logEvent(req.userId, 'grocery', { term: name });
       await prisma.groceryItem.createMany({
-        data: missing.map((name) => ({ userId: req.userId, name, recipeId, recipeName: recipe.name })),
+        data: missing.map((name) => ({
+          userId: req.userId,
+          name,
+          recipeId,
+          recipeName: recipe.name,
+          quantity: measureOf.get(name.toLowerCase())?.slice(0, 100) || null,
+        })),
       });
     }
     const added = await prisma.groceryItem.findMany({
       where: { userId: req.userId, recipeId, name: { in: missing } },
       orderBy: { createdAt: 'asc' },
     });
-    return { added: added.map(groceryDTO), skipped: needed.length - missing.length };
+    return { added: added.map(groceryDTO), skipped: chosen.length - missing.length };
   });
 
   app.patch<{ Params: { id: string }; Body: { checked?: boolean } }>(

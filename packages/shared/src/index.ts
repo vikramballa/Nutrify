@@ -31,6 +31,8 @@ export const RecipeSchema = z.object({
   // Estimated from total ingredient weight — sources carry no serving count.
   // The per-serving macros above are divided by this.
   servings: z.number().int().nullable(),
+  // Grams in one serving of the finished dish, when known.
+  servingGrams: z.number().int().nullable().optional(),
   ingredients: z.array(IngredientSchema),
 });
 export type Recipe = z.infer<typeof RecipeSchema>;
@@ -42,6 +44,7 @@ export const RecipeNutritionSchema = z.object({
   fat: z.number().int(),
   perServing: z.literal(true),
   servings: z.number().int(),
+  servingGrams: z.number().int().nullable().optional(),
 });
 export type RecipeNutrition = z.infer<typeof RecipeNutritionSchema>;
 
@@ -351,6 +354,8 @@ export const GroceryItemSchema = z.object({
   checked: z.boolean(),
   recipeId: z.string().nullable(),
   recipeName: z.string().nullable(),
+  // How much the recipe calls for ("500 g"), for items added from a recipe.
+  quantity: z.string().nullable().optional(),
 });
 export type GroceryItem = z.infer<typeof GroceryItemSchema>;
 
@@ -359,6 +364,16 @@ export const GroceryFromRecipeResponseSchema = z.object({
   skipped: z.number().int(),
 });
 export type GroceryFromRecipeResponse = z.infer<typeof GroceryFromRecipeResponseSchema>;
+
+/**
+ * `names` = the ingredients the user marked as missing. Omitted means all of
+ * them. Quantities come from the stored recipe, never from the client.
+ */
+export const GroceryFromRecipeRequestSchema = z.object({
+  recipeId: z.string().min(1).max(64),
+  names: z.array(z.string().min(1).max(200)).max(100).optional(),
+});
+export type GroceryFromRecipeRequest = z.infer<typeof GroceryFromRecipeRequestSchema>;
 
 // ---------------------------------------------------------------------------
 // Meal plan
@@ -509,6 +524,14 @@ export type ProgressSummaryResponse = z.infer<typeof ProgressSummaryResponseSche
 export const MealPhotoItemSchema = z.object({
   name: z.string().min(1).max(200),
   grams: z.number().nonnegative(),
+  // Countable items ("3 idli") — the API weighs them with its own piece table.
+  count: z.number().int().positive().max(50).optional(),
+  calories: z.number().nonnegative().optional(),
+  protein: z.number().nonnegative().optional(),
+  carbs: z.number().nonnegative().optional(),
+  fat: z.number().nonnegative().optional(),
+  // True when the macros came from the nutrition tables, false = model estimate.
+  matched: z.boolean().optional(),
 });
 export type MealPhotoItem = z.infer<typeof MealPhotoItemSchema>;
 
@@ -554,14 +577,54 @@ export const NutritionLabelAnalysisSchema = z.object({
   carbs: z.number().int().nonnegative(),
   fat: z.number().int().nonnegative(),
   note: z.string().optional(),
+  // Indian (FSSAI) labels print per 100 g, often with no serving at all; with
+  // these the app lets the user enter grams eaten instead of servings.
+  per100g: z
+    .object({
+      calories: z.number().nonnegative(),
+      protein: z.number().nonnegative(),
+      carbs: z.number().nonnegative(),
+      fat: z.number().nonnegative(),
+    })
+    .optional(),
+  servingGrams: z.number().positive().max(10_000).optional(),
+  packGrams: z.number().positive().max(10_000).optional(),
+  // 'device' = read by on-device OCR + parseLabelText; 'ai' = the vision model.
+  source: z.enum(['device', 'ai']).optional(),
 });
 export type NutritionLabelAnalysis = z.infer<typeof NutritionLabelAnalysisSchema>;
 
 /** Same envelope as the meal photo scanner: one data URL, size-capped by the route. */
 export const AnalyzeNutritionLabelSchema = z.object({
   image: z.string().regex(/^data:image\/(jpeg|jpg|png|webp);base64,/),
+  // On-device OCR text that parseLabelText couldn't use on its own. The
+  // model reads digits more reliably with it beside the photo.
+  ocrText: z.string().max(4000).optional(),
 });
 export type AnalyzeNutritionLabel = z.infer<typeof AnalyzeNutritionLabelSchema>;
+
+/**
+ * A label read on the phone, in the same shape the vision route returns, so
+ * the scan screen handles both alike. Per-serving numbers fall back to the
+ * per-100 g column when the label prints no serving (most Indian packs).
+ */
+export function labelAnalysisFromParsed(parsed: ParsedLabel): NutritionLabelAnalysis {
+  const shown = parsed.perServing ?? parsed.per100g!;
+  const servingGrams = parsed.perServing ? parsed.servingGrams : 100;
+  return {
+    productName: 'Packaged food',
+    servingSize: parsed.servingSize ?? (servingGrams ? `${servingGrams} g` : '1 serving'),
+    ...(parsed.servingsPerContainer ? { servingsPerContainer: parsed.servingsPerContainer } : {}),
+    calories: Math.round(shown.calories),
+    protein: Math.round(shown.protein),
+    carbs: Math.round(shown.carbs),
+    fat: Math.round(shown.fat),
+    ...(parsed.per100g ? { per100g: parsed.per100g } : {}),
+    ...(servingGrams ? { servingGrams } : {}),
+    ...(parsed.packGrams ? { packGrams: parsed.packGrams } : {}),
+    source: 'device',
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Pantry — "what can I cook with what I have?"
@@ -650,6 +713,8 @@ export const AIRecipeSchema = z.object({
   instructions: z.string().min(1),
   prepMinutes: z.number().int().nonnegative(),
   cookMinutes: z.number().int().nonnegative(),
+  // How many people the quantities feed, as the recipe would say.
+  servings: z.number().int().min(1).max(16).optional(),
 });
 export type AIRecipe = z.infer<typeof AIRecipeSchema>;
 
@@ -659,38 +724,43 @@ export type AIRecipe = z.infer<typeof AIRecipeSchema>;
 
 // Units the API's measureToGrams understands, so a parsed measure round-trips.
 const TEXT_UNITS =
-  'kg|g|grams?|mg|oz|ounces?|lbs?|pounds?|ml|l|litres?|liters?|tsp|teaspoons?|tbsp|tbs|tablespoons?|cups?|pints?|cans?|tins?|slices?|handfuls?|bowls?|glass(?:es)?|scoops?|pinch(?:es)?|bunch(?:es)?|knobs?|rashers?|cloves?|sticks?|packets?|packs?|bags?|sheets?|cubes?';
+  'kg|g|grams?|mg|oz|ounces?|lbs?|pounds?|ml|l|litres?|liters?|tsp|teaspoons?|tbsp|tbs|tablespoons?|cups?|pints?|cans?|tins?|slices?|handfuls?|bowls?|glass(?:es)?|plates?|katoris?|ladles?|tumblers?|servings?|portions?|helpings?|scoops?|pinch(?:es)?|bunch(?:es)?|knobs?|rashers?|cloves?|sticks?|packets?|packs?|bags?|sheets?|cubes?';
 const WORD_QTY: Record<string, string> = {
   a: '1', an: '1', one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', half: '1/2',
 };
 // Digits may be glued to a unit ("200g"); a word quantity needs a space, so
 // "a" never eats the first letter of "apple".
 const LEADING = new RegExp(
-  String.raw`^(?:(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?|[½¼¾])\s*|(a|an|one|two|three|four|five|six|half)\s+)` +
-    String.raw`(?:(${TEXT_UNITS})\b\.?\s*)?(?:pieces?\s+)?(?:of\s+)?(.+)$`,
+  String.raw`^(?:(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?|[½¼¾])\s*(?:x\s+)?|(a|an|one|two|three|four|five|six|half)\s+)` +
+    String.raw`(?:(${TEXT_UNITS})\b\.?\s*)?(?:(?:pieces?|pcs?)\b\.?\s*)?(?:of\s+)?(.+)$`,
   'i',
 );
 // "handful of almonds", "bowl of rice" — a unit with no number means one.
 const UNIT_ONLY = new RegExp(String.raw`^(${TEXT_UNITS})\b\.?\s+(?:of\s+)?(.+)$`, 'i');
 const TRAILING = new RegExp(String.raw`^(.+?)\s+(\d+(?:\.\d+)?)\s*(${TEXT_UNITS})$`, 'i');
+// "idli x3", "dosa × 2" — a count after the food. A bare trailing number is
+// not one: "chicken 65" is a dish.
+const TRAILING_COUNT = /^(.+?)\s*[x×]\s*(\d+)$/i;
 
 /**
  * Split a typed meal into name/measure items. Pure and synchronous, so the
  * client can show the rows instantly and the API's measure maths does the rest.
  * No quantity means one piece ("toast" → "1").
  *
- * ponytail: splits on "and", so "mac and cheese" becomes two rows; the
+ * ponytail: splits on "and"/"with", so "mac and cheese" becomes two rows; the
  * user sees the rows before logging and can merge them. A real food NER is the
  * upgrade if that proves common.
  */
 export function parseMealText(text: string): CustomLogItem[] {
   return text
-    .split(/[,;\n+&]|\band\b/i)
+    .split(/[,;\n+&]|\band\b|\bwith\b/i)
     .map((chunk) => chunk.trim().replace(/\s+/g, ' '))
     .filter((chunk) => /[a-z]/i.test(chunk))
     .map((chunk) => {
       const trail = chunk.match(TRAILING);
       if (trail) return { name: trail[1], measure: `${trail[2]} ${trail[3].toLowerCase()}` };
+      const count = chunk.match(TRAILING_COUNT);
+      if (count) return { name: count[1].trim(), measure: count[2] };
       const unitOnly = chunk.match(UNIT_ONLY);
       if (unitOnly) return { name: unitOnly[2].trim(), measure: `1 ${unitOnly[1].toLowerCase()}` };
       const lead = chunk.match(LEADING);
@@ -788,3 +858,7 @@ export const AdaptiveGoalsResponseSchema = z.discriminatedUnion('status', [
   }),
 ]);
 export type AdaptiveGoalsResponse = z.infer<typeof AdaptiveGoalsResponseSchema>;
+
+export * from './labelText';
+import type { ParsedLabel } from './labelText';
+export * from './shopping';
