@@ -7,7 +7,9 @@
 **A recipe and nutrition app that learns what you like to eat.**
 
 Snap a meal, cook from what's in your pantry, plan the week, and track your
-macros. Calories come from a real nutrition pipeline (USDA), not from guesses.
+macros. Calories come from a real nutrition pipeline (USDA + the Indian Nutrient
+Databank), not from guesses, and Indian meals (idli, dosa, dal, roti, biryani…) are
+first-class.
 
 ![Expo](https://img.shields.io/badge/Expo-SDK%2054-000020?logo=expo&logoColor=white)
 ![React Native](https://img.shields.io/badge/React%20Native-0.81-61DAFB?logo=react&logoColor=black)
@@ -15,7 +17,7 @@ macros. Calories come from a real nutrition pipeline (USDA), not from guesses.
 ![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-138%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-171%20passing-brightgreen)
 
 </div>
 
@@ -45,10 +47,13 @@ macros. Calories come from a real nutrition pipeline (USDA), not from guesses.
 
 | | |
 | --- | --- |
-| 📸 **Scan a meal** | Photograph your plate. A vision model names the dish, splits it into components with gram weights, estimates macros and says how confident it is. Also reads **nutrition labels** and **barcodes** (Open Food Facts). |
+| 📸 **Scan a meal** | Photograph your plate. A vision model names each item with its grams (and pieces: "3 idli"), then NutriChef's own food tables price every item they know, so the calories don't depend on the model's arithmetic. |
+| 🏷️ **Nutrition labels** | Read **on the phone** with Apple's built-in text recognition: free, offline, no AI permission. Handles US panels and Indian/FSSAI "per 100 g" tables, kJ and decimal commas; pick how many grams you ate. Falls back to the vision model only when the text doesn't add up. **Barcodes** via Open Food Facts. |
+| 🍛 **Indian food** | ~200 prepared dishes (tiffins, curries, rice, breads, snacks, sweets, drinks) and household units: "3 idli", "1 katori dal", "1 plate biryani", "dosa x2". 80 curated Indian recipes with declared servings; the **Indian** chip covers every regional cuisine. |
 | 🥘 **Cook from pantry** | List what's in your kitchen and get dishes ranked by how little is missing. Missing items go straight to the grocery list. |
+| 🛒 **Shop a recipe** | Tap **Shop** on a recipe, mark what you already have (salt and spices start ticked), and only the missing ingredients go on the list with their quantities. Each item opens **Blinkit, Zepto or Instamart** search in their app (universal links), remembering your last store. None of them has a public cart API, so it's one search per item. |
 | 📅 **Meal planning** | A weekly plan with one-tap auto-fill from your taste profile, then the whole week's ingredients sent to the grocery list. |
-| 📊 **Tracking** | Typed meal logging ("2 eggs, toast, handful of almonds"), water, weight, streaks and progress charts. |
+| 📊 **Tracking** | Typed meal logging ("2 eggs, toast, handful of almonds"), portion-aware recipe logging (½ to 3 servings), water, weight, streaks and progress charts. |
 | 🎯 **Adaptive goals** | After a few weeks of logs and weigh-ins, NutriChef measures your actual daily energy use (TDEE) and recalibrates your calorie target. |
 | 🧠 **Taste engine** | Personalised suggestions with **no LLM**: implicit feedback (views, logs, favourites, dislikes…) is folded into a time-decayed profile, and every suggestion comes with the reasons it was picked. |
 | 💬 **Ask NutriChef** | A chat assistant that only talks about food and nutrition, plus a weekly coach that reviews your real logs. |
@@ -59,13 +64,18 @@ macros. Calories come from a real nutrition pipeline (USDA), not from guesses.
 
 Every calorie runs through one pipeline: ingredient → grams → per-100 g macros →
 per serving. It uses a curated static table first, then **USDA FoodData Central**,
-and caches every lookup in Postgres. Along the way it:
+and caches every lookup in Postgres. Indian dishes come from the
+[Indian Nutrient Databank](https://github.com/lindsayjaacks/Indian-Nutrient-Databank-INDB-)
+(2024) where its values are plausible. Along the way it:
 
 - understands food-specific units: a stick of butter is 113 g, a stick of cinnamon 3 g
 - uses each food's density for volumes: a cup of flour is 127 g, a cup of milk 247 g
 - converts dry grains and pulses with cooked yields
 - matches whole words, so "eggplant" never counts as egg and "pineapple" never as apple
-- estimates servings from the weight of the finished dish
+- weighs meat raw, as recipes list it, so a curry isn't credited with cooked-meat protein
+- counts water the grains absorb (minus evaporation), only ~15% of a frying pot of oil,
+  and half the syrup of a soaked sweet
+- uses the recipe's declared servings, else estimates them from the weight of the finished dish
 
 ## Tech stack
 
@@ -124,6 +134,7 @@ Key environment variables (the full documented list is in [`.env.example`](.env.
 
 ```bash
 npm run db:setup          # apply migrations + seed demo data
+npm run db:seed:indian -w apps/api   # 80 curated Indian recipes (re-run safely; recomputes nutrition)
 npm run db:import         # optional: bulk-import recipes from TheMealDB
 ```
 
@@ -146,6 +157,10 @@ Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env` to match where the app runs:
 
 > The meal scanner needs a vision-capable provider. Without one, `/vision/*`
 > returns 503 and the Scan tab says so plainly. The rest of the app keeps working.
+
+> On-device label reading is a local native module (`apps/mobile/modules/label-ocr`),
+> so it needs a development or release build (`npx expo prebuild -p ios`). In Expo Go
+> the label scanner falls back to the vision model.
 
 ## Development
 
@@ -195,6 +210,7 @@ from the same geometry by `apps/mobile/scripts/generate_icons.py` (needs Pillow)
 │       │   ├── api/           fetch client with transparent token refresh
 │       │   ├── notifications/ local reminder scheduling
 │       │   └── theme/         colours, type, motion vocabulary
+│       ├── modules/label-ocr/ on-device text recognition (Apple Vision)
 │       └── plugins/           Expo config plugins
 ├── packages/shared/           zod schemas + nutrition maths (API ↔ app contract)
 ├── docs/screenshots/          README images
