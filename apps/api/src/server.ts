@@ -19,6 +19,7 @@ import { assistantRoutes } from './routes/assistant.js';
 import { foodRoutes } from './routes/foods.js';
 import { legalRoutes } from './routes/legal.js';
 import { verifyAccessToken } from './lib/auth.js';
+import { loadAuthUser } from './lib/authUser.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -61,14 +62,12 @@ app.addHook('onRequest', async (req, reply) => {
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   const userId = token ? verifyAccessToken(token) : null;
   if (!userId) return reply.code(401).send({ error: 'unauthorized' });
-  // A token for a deleted user must not authorize anything.
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { aiConsentAt: true },
-  });
+  // A token for a deleted user must not authorize anything. Cached for a few
+  // seconds (see authUser.ts); deletion and consent changes clear it.
+  const user = await loadAuthUser(userId);
   if (!user) return reply.code(401).send({ error: 'unauthorized' });
   req.userId = userId;
-  req.aiConsent = user.aiConsentAt != null;
+  req.aiConsent = user.aiConsent;
 });
 
 // Errors are always JSON: { error: { code, message } }. Known Prisma errors

@@ -8,6 +8,25 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # A real Postgres, so every migration is applied on each push and the
+    # database tests (apps/api/test/db) run against it.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nutrichef
+          POSTGRES_PASSWORD: nutrichef
+          POSTGRES_DB: nutrichef
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nutrichef"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://nutrichef:nutrichef@localhost:5432/nutrichef
+      DB_TESTS: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +43,13 @@ jobs:
 
       - name: Build shared package
         run: npm run build -w packages/shared
+
+      - name: Apply migrations
+        run: npm exec -w apps/api -- prisma migrate deploy
+
+      - name: Schema matches migrations
+        # Fails when schema.prisma changed without a migration (or vice versa).
+        run: npm exec -w apps/api -- prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code
 
       - name: Typecheck (all workspaces)
         run: |

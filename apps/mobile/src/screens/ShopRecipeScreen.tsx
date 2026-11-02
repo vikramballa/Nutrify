@@ -11,6 +11,9 @@ import { SCREEN_PADDING, fonts, radii, type } from '../theme/typography';
 import { FadeIn, PopIn, PressableScale } from '../theme/motion';
 import { Card } from '../components/Card';
 import { useGrocery } from '../hooks/useGrocery';
+import { useFullRecipe } from '../hooks/useRecipes';
+import { ErrorState } from '../components/States';
+import type { Recipe } from '@nutrichef/shared';
 
 const keyOf = (name: string) => name.trim().toLowerCase();
 
@@ -38,9 +41,21 @@ function rowsOf(ingredients: { name: string; measure: string; position: number }
  * to buy from Blinkit, Zepto or Instamart.
  */
 export function ShopRecipeScreen() {
+  const { recipe: card } = useRoute<RouteProp<RootStackParamList, 'ShopRecipe'>>().params;
+  // The detail screen passes the full recipe; this covers any card that
+  // arrives without ingredients, so the "have" ticks start from real rows.
+  const { recipe, complete, failed, retry } = useFullRecipe(card);
+  if (complete) return <ShopRecipeContent recipe={recipe} />;
+  return (
+    <View style={styles.loading}>
+      {failed ? <ErrorState onRetry={() => void retry()} /> : <ActivityIndicator color={colors.primary} />}
+    </View>
+  );
+}
+
+function ShopRecipeContent({ recipe }: { recipe: Recipe }) {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
-  const { recipe } = useRoute<RouteProp<RootStackParamList, 'ShopRecipe'>>().params;
   const { list, addFromRecipe } = useGrocery();
 
   const rows = useMemo(() => rowsOf(recipe.ingredients), [recipe.ingredients]);
@@ -232,6 +247,7 @@ function QuickChip({
 }
 
 const styles = StyleSheet.create({
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background },
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: SCREEN_PADDING, paddingBottom: 24, gap: 16 },
   flex1: { flex: 1 },

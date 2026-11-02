@@ -1,6 +1,7 @@
 import type { Recipe } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
-import { toDTO } from './recipeService.js';
+import { recipesByIds } from './recipeService.js';
+import type { RecipeShape } from '@nutrichef/shared';
 
 /**
  * The recommendation "brain": no LLM anywhere. It learns from usage by
@@ -28,6 +29,9 @@ export const EVENT_WEIGHTS = {
   suggest: 0, // recorded only so we can detect ignored suggestions
 } as const;
 export type EventType = keyof typeof EVENT_WEIGHTS;
+
+/** Event types that carry taste signal (everything except weight-0 'suggest'). */
+export const SIGNAL_TYPES = (Object.keys(EVENT_WEIGHTS) as EventType[]).filter((t) => EVENT_WEIGHTS[t] !== 0);
 
 /** Older signals fade: an event loses ~3%/day, so last week beats last month. */
 const DAILY_DECAY = 0.97;
@@ -167,8 +171,11 @@ export function logEvent(
  */
 async function signalEvents(userId: string): Promise<TasteEvent[]> {
   const since = new Date(Date.now() - EVENT_WINDOW_DAYS * 86_400_000);
+  // Filtering on type (not weight) lets Postgres use the
+  // (userId, type, createdAt) index and skip the suggest rows entirely,
+  // instead of reading past all of them in (userId, createdAt) order.
   return prisma.userEvent.findMany({
-    where: { userId, createdAt: { gte: since }, weight: { not: 0 } },
+    where: { userId, type: { in: SIGNAL_TYPES }, createdAt: { gte: since } },
     orderBy: { createdAt: 'desc' },
     take: MAX_EVENTS,
   });
@@ -275,7 +282,11 @@ export interface Recommendation {
 /** How many matched tokens to show as the "why this?" explanation. */
 const REASON_TOKENS = 3;
 
-export async function recommend(userId: string, count: number): Promise<Recommendation> {
+export async function recommend(
+  userId: string,
+  count: number,
+  shape: RecipeShape = 'full',
+): Promise<Recommendation> {
   const { profile, candidates } = await think(userId);
   if (candidates.length === 0) return { recipes: [], personalized: false, reasons: {} };
   // Cold start: no signals yet — anything goes.
@@ -295,13 +306,8 @@ export async function recommend(userId: string, count: number): Promise<Recommen
     picks = [...candidates].sort(() => Math.random() - 0.5).slice(0, count);
   }
 
-  // Only the winners are loaded in full; scoring needs tokens, not DTOs.
-  const rows = await prisma.recipe.findMany({
-    where: { id: { in: picks.map((p) => p.recipeId) } },
-    include: { ingredients: true },
-  });
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const recipes = picks.map((p) => byId.get(p.recipeId)).filter(Boolean).map((r) => toDTO(r!));
+  // Only the winners are loaded; scoring needs tokens, not DTOs.
+  const recipes = await recipesByIds(picks.map((p) => p.recipeId), shape);
 
   // Remember what we showed, so ignoring it becomes a negative signal.
   prisma.userEvent

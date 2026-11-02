@@ -17,6 +17,7 @@ import {
 import { logEvent } from '../services/taste.js';
 import { dayRange } from '../services/tracking.js';
 import { computeStreak } from '../services/streak.js';
+import { loggedDays, recentDistinctMeals } from '../services/logQueries.js';
 import { dayKey } from '../services/mealplan.js';
 import { intParam } from '../lib/query.js';
 
@@ -219,17 +220,9 @@ export async function logRoutes(app: FastifyInstance) {
   /** The handful of meals this user actually repeats, newest first. */
   app.get('/logs/recent', async (req) => {
     const since = new Date(Date.now() - RECENT_MEAL_DAYS * 86_400_000);
-    // DISTINCT ON (name) — one row per dish, the most recent time it was eaten.
-    const rows = await prisma.mealLog.findMany({
-      where: { userId: req.userId, at: { gte: since } },
-      distinct: ['name'],
-      orderBy: [{ name: 'asc' }, { at: 'desc' }],
-      take: 50,
-    });
-    const meals = rows
-      .sort((a, b) => b.at.getTime() - a.at.getTime())
-      .slice(0, RECENT_MEAL_COUNT)
-      .map((l) => ({
+    // One row per dish, the most recent time it was eaten, newest first.
+    const rows = await recentDistinctMeals(req.userId, since, RECENT_MEAL_COUNT);
+    const meals = rows.map((l) => ({
         logId: l.id,
         name: l.name,
         mealType: l.mealType,
@@ -260,12 +253,9 @@ export async function logRoutes(app: FastifyInstance) {
   /** Logging streak. Distinct UTC days only — five meals in a day is one day. */
   app.get('/streak', async (req) => {
     const since = new Date(Date.now() - STREAK_LOOKBACK_DAYS * 86_400_000);
-    const rows = await prisma.mealLog.findMany({
-      where: { userId: req.userId, at: { gte: since } },
-      select: { at: true },
-      orderBy: { at: 'asc' },
-    });
-    return computeStreak(rows.map((r) => dayKey(r.at)));
+    // Postgres returns one row per logged day (≤ 400), not every meal.
+    const days = await loggedDays(req.userId, since);
+    return computeStreak(days.map(dayKey));
   });
 
   app.delete<{ Params: { id: string } }>('/logs/:id', async (req, reply) => {

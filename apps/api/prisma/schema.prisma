@@ -112,6 +112,8 @@ model MealLog {
   at       DateTime @default(now())
 
   @@index([userId, at])
+  // "Recent meals": the newest row per dish name (DISTINCT ON name).
+  @@index([userId, name, at(sort: Desc)])
   @@index([recipeId])
 }
 
@@ -192,7 +194,8 @@ model UserEvent {
   // real signals, so filtering type after the (userId, createdAt) range scan
   // walks all of them.
   @@index([userId, type, createdAt])
-  @@index([recipeId])
+  // (No recipeId index: recipeId has no foreign key and no query filters on
+  // it alone, so it was pure write cost on the busiest table.)
   // Retention sweeps delete by age across all users.
   @@index([createdAt])
 }
@@ -250,6 +253,8 @@ model GroceryItem {
   createdAt  DateTime @default(now())
 
   @@index([userId, createdAt])
+  // Shop-a-recipe and "add the week to grocery" look items up by recipe.
+  @@index([userId, recipeId])
   @@index([recipeId])
 }
 
@@ -303,7 +308,8 @@ model Ingredient {
   measure  String
   position Int
 
-  @@index([recipeId])
+  // Serves "this recipe's ingredients, in order" without a sort.
+  @@index([recipeId, position])
 }
 
 model RecipeInsight {

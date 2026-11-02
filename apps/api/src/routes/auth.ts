@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma.js';
+import { forgetAuthUser } from '../lib/authUser.js';
 import {
   hashPassword,
   verifyPassword,
@@ -161,6 +162,7 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: 'wrong_password' });
     }
     await prisma.user.delete({ where: { id: user.id } });
+    forgetAuthUser(user.id); // its access token must stop working now, not in 30 s
     return { deleted: true };
   });
 }

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { RecipeSchema } from '@nutrichef/shared';
 import { apiFetch, parseWith } from '../api/client';
+import { CARD } from './useRecipes';
 
 const KEY = ['favorites'];
 const FavoritesSchema = z.object({ recipes: z.array(RecipeSchema) });
@@ -10,7 +11,7 @@ export function useFavorites() {
   return useQuery({
     queryKey: KEY,
     queryFn: async () =>
-      parseWith(FavoritesSchema, await apiFetch('/favorites'), 'favorites'),
+      parseWith(FavoritesSchema, await apiFetch(`/favorites?${CARD}`), 'favorites'),
   });
 }
 

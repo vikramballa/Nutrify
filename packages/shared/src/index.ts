@@ -34,8 +34,15 @@ export const RecipeSchema = z.object({
   // Grams in one serving of the finished dish, when known.
   servingGrams: z.number().int().nullable().optional(),
   ingredients: z.array(IngredientSchema),
+  // True on a list "card" (requested with ?fields=card): ingredients and
+  // instructions are left empty to keep lists small, and the detail screen
+  // fetches GET /recipes/:id for them.
+  partial: z.boolean().optional(),
 });
 export type Recipe = z.infer<typeof RecipeSchema>;
+
+/** How much of a recipe a list endpoint returns: everything, or a card. */
+export type RecipeShape = 'full' | 'card';
 
 export const RecipeNutritionSchema = z.object({
   calories: z.number().int(),

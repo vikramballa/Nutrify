@@ -18,55 +18,60 @@ const CUISINE_RE = /^[A-Za-z][A-Za-z -]{0,39}$/;
 // the free-tier quota for everyone.
 const AI_RATE_LIMIT = { rateLimit: { max: 30, timeWindow: '1 minute' } };
 
+type ListQuery = { take?: string; cursor?: string; fields?: string };
+
 function parsePage(q: { take?: string; cursor?: string }): { take: number; cursor?: string } {
   return { take: intParam(q.take, 20, 50), cursor: q.cursor };
 }
 
 export async function recipeRoutes(app: FastifyInstance) {
-  app.get<{ Querystring: { q?: string; take?: string; cursor?: string } }>(
+  app.get<{ Querystring: ListQuery & { q?: string } }>(
     '/recipes/search',
     { config: AI_RATE_LIMIT },
     async (req, reply) => {
       const q = req.query.q ?? '';
       if (q.length > MAX_QUERY_LEN) return reply.code(400).send({ error: 'query_too_long' });
       if (q.trim()) taste.logEvent(req.userId, 'search', { term: q });
-      return recipes.search(q, parsePage(req.query));
+      return recipes.search(q, parsePage(req.query), recipes.shapeParam(req.query.fields));
     },
   );
 
-  app.get<{ Querystring: { count?: string } }>('/recipes/random', async (req) => {
+  app.get<{ Querystring: { count?: string; fields?: string } }>('/recipes/random', async (req) => {
     const count = intParam(req.query.count, 5, 10);
-    return { recipes: await recipes.getRandom(count) };
+    return { recipes: await recipes.getRandom(count, recipes.shapeParam(req.query.fields)) };
   });
 
   // The full library for the Recipes tab grid (search needs a term).
-  app.get<{ Querystring: { take?: string; cursor?: string } }>('/recipes/browse', async (req) =>
-    recipes.browse(parsePage(req.query)),
+  app.get<{ Querystring: ListQuery }>('/recipes/browse', async (req) =>
+    recipes.browse(parsePage(req.query), recipes.shapeParam(req.query.fields)),
   );
 
   // Cuisines available for the browse chips (TheMealDB areas + DB).
   app.get('/recipes/cuisines', async () => ({ cuisines: await recipes.listCuisines() }));
 
   // Full recipe list for one cuisine; syncs from TheMealDB into the DB.
-  app.get<{ Querystring: { cuisine?: string; take?: string; cursor?: string } }>(
+  app.get<{ Querystring: ListQuery & { cuisine?: string } }>(
     '/recipes/by-cuisine',
     async (req, reply) => {
       const cuisine = (req.query.cuisine ?? '').trim();
       if (!cuisine) return reply.code(400).send({ error: 'cuisine_required' });
       if (!CUISINE_RE.test(cuisine)) return reply.code(400).send({ error: 'invalid_cuisine' });
       taste.logEvent(req.userId, 'search', { term: cuisine.toLowerCase() });
-      return { recipes: await recipes.getByCuisine(cuisine, parsePage(req.query)) };
+      return {
+        recipes: await recipes.getByCuisine(cuisine, parsePage(req.query), recipes.shapeParam(req.query.fields)),
+      };
     },
   );
 
   // Personalized suggestions learned from the user's behavior (no LLM).
-  app.get<{ Querystring: { count?: string } }>('/recipes/recommended', async (req) => {
+  app.get<{ Querystring: { count?: string; fields?: string } }>('/recipes/recommended', async (req) => {
     const count = intParam(req.query.count, 5, 10);
-    const rec = await taste.recommend(req.userId, count);
+    const shape = recipes.shapeParam(req.query.fields);
+    const rec = await taste.recommend(req.userId, count, shape);
     // Empty DB (fresh install) — fall back to the random pipeline, which
     // also pulls from TheMealDB.
     if (rec.recipes.length === 0) {
-      return { recipes: await recipes.getRandom(count), personalized: false, reasons: {} };
+      return { recipes: await recipes.getRandom(count, shape), personalized: false, reasons: {} };
     }
     return rec;
   });

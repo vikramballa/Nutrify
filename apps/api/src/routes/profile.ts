@@ -8,9 +8,11 @@ import {
   type ProfileResponse,
 } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
+import { forgetAuthUser } from '../lib/authUser.js';
 import type { User, NutritionGoals } from '@prisma/client';
 import { computeAdaptiveGoals, WINDOW_DAYS } from '../services/adaptive.js';
 import { computeDailyTotals, dayRange } from '../services/tracking.js';
+import { dailyMacroTotals } from '../services/logQueries.js';
 import { dayKey } from '../services/mealplan.js';
 
 function profileOf(user: User): ProfileInput | null {
@@ -56,11 +58,7 @@ async function adaptiveFor(userId: string) {
   const range = dayRange(WINDOW_DAYS);
   const window = { gte: range.start, lt: range.endExclusive };
   const [logs, weights] = await Promise.all([
-    prisma.mealLog.findMany({
-      where: { userId, at: window },
-      select: { at: true, calories: true, protein: true, carbs: true, fat: true },
-      take: 5000,
-    }),
+    dailyMacroTotals(userId, range.start, range.endExclusive),
     prisma.weightEntry.findMany({
       where: { userId, date: window },
       select: { date: true, kg: true },
@@ -89,6 +87,7 @@ export async function profileRoutes(app: FastifyInstance) {
       where: { id: req.userId },
       data: { aiConsentAt: parsed.data.granted ? new Date() : null },
     });
+    forgetAuthUser(req.userId); // the next request must see the new consent
     return { aiConsent: parsed.data.granted };
   });
 

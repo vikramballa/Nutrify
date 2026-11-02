@@ -1,6 +1,7 @@
-import type { Ingredient as IngredientModel, Recipe as RecipeModel } from '@prisma/client';
-import { AIRecipeSchema, type Recipe, type SearchSource } from '@nutrichef/shared';
+import type { Ingredient as IngredientModel, Prisma, Recipe as RecipeModel } from '@prisma/client';
+import { AIRecipeSchema, type Recipe, type RecipeShape, type SearchSource } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
+import { TtlCache } from '../lib/ttlCache.js';
 import { extractJson } from '../lib/json.js';
 import { searchMeals, randomMeals, mealsByArea, type ParsedMeal } from './mealdb.js';
 import { aiComplete } from './ai/index.js';
@@ -49,6 +50,66 @@ export function cuisineFamily(cuisine: string): string {
 /** Every stored cuisine label a browse chip covers. */
 export function cuisineMembers(cuisine: string): string[] {
   return CUISINE_FAMILIES[cuisine] ?? [cuisine];
+}
+
+/**
+ * A recipe card: every column a list shows, without instructions (long text
+ * Postgres stores out of line) or the ingredient rows (10-15 per recipe).
+ */
+const CARD_SELECT = {
+  id: true,
+  externalId: true,
+  name: true,
+  category: true,
+  cuisine: true,
+  imageUrl: true,
+  prepMinutes: true,
+  cookMinutes: true,
+  source: true,
+  calories: true,
+  protein: true,
+  carbs: true,
+  fat: true,
+  servings: true,
+  servingGrams: true,
+} satisfies Prisma.RecipeSelect;
+type RecipeCardRow = Prisma.RecipeGetPayload<{ select: typeof CARD_SELECT }>;
+
+export function toCardDTO(r: RecipeCardRow): Recipe {
+  return {
+    ...r,
+    source: r.source as Recipe['source'],
+    instructions: '',
+    ingredients: [],
+    partial: true,
+  };
+}
+
+/** Parse the list endpoints' `?fields=` query: `card` or the full recipe. */
+export function shapeParam(fields: string | undefined): RecipeShape {
+  return fields === 'card' ? 'card' : 'full';
+}
+
+type FindArgs = Omit<Prisma.RecipeFindManyArgs, 'select' | 'include'>;
+
+/**
+ * findMany for recipe lists in either shape. `full` is what every client got
+ * before cards existed, and stays the default so installed app versions keep
+ * working.
+ */
+export async function findRecipes(args: FindArgs, shape: RecipeShape = 'full'): Promise<Recipe[]> {
+  if (shape === 'card') {
+    return (await prisma.recipe.findMany({ ...args, select: CARD_SELECT })).map(toCardDTO);
+  }
+  return (await prisma.recipe.findMany({ ...args, include: { ingredients: true } })).map(toDTO);
+}
+
+/** Recipes by id in the order given (findMany returns them unordered). */
+export async function recipesByIds(ids: string[], shape: RecipeShape = 'full'): Promise<Recipe[]> {
+  if (ids.length === 0) return [];
+  const rows = await findRecipes({ where: { id: { in: ids } } }, shape);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.map((id) => byId.get(id)).filter((r): r is Recipe => !!r);
 }
 
 export function toDTO(r: RecipeWithIngredients): Recipe {
@@ -114,32 +175,32 @@ export interface PageOpts {
 export async function search(
   q: string,
   page: PageOpts = { take: 20 },
+  shape: RecipeShape = 'full',
 ): Promise<{ recipes: Recipe[]; source: SearchSource }> {
   const term = q.trim().toLowerCase();
   if (!term) return { recipes: [], source: 'none' };
 
   // 1. DB cache: name substring + exact SearchTerm mapping.
-  const byName = await prisma.recipe.findMany({
-    where: { nameLower: { contains: term } },
-    include: { ingredients: true },
-    orderBy: { id: 'asc' },
-    take: page.take,
-    ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),
-  });
+  const byName = await findRecipes(
+    {
+      where: { nameLower: { contains: term } },
+      orderBy: { id: 'asc' },
+      take: page.take,
+      ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),
+    },
+    shape,
+  );
   // The term→recipe mapping is a first-page extra, not part of the cursor
   // sequence: merging it into every page both broke the page size and made
   // the same recipe reappear after the cursor had already passed it.
   const mapped = page.cursor
     ? null
-    : await prisma.searchTerm.findUnique({
-        where: { term },
-        include: { recipe: { include: { ingredients: true } } },
-      });
-  const cache = new Map<string, RecipeWithIngredients>();
-  if (mapped) cache.set(mapped.recipe.id, mapped.recipe);
+    : await prisma.searchTerm.findUnique({ where: { term }, select: { recipeId: true } });
+  const cache = new Map<string, Recipe>();
+  if (mapped) for (const r of await recipesByIds([mapped.recipeId], shape)) cache.set(r.id, r);
   for (const r of byName) cache.set(r.id, r);
   if (cache.size > 0) {
-    return { recipes: [...cache.values()].slice(0, page.take).map(toDTO), source: 'cache' };
+    return { recipes: [...cache.values()].slice(0, page.take), source: 'cache' };
   }
 
   // 2. TheMealDB.
@@ -210,17 +271,22 @@ export async function search(
  * The whole library, paginated. Search needs a term and random caps at 10, so
  * the browse grid had nothing to list from.
  */
-export async function browse(page: PageOpts = { take: 30 }): Promise<{ recipes: Recipe[] }> {
-  const rows = await prisma.recipe.findMany({
-    include: { ingredients: true },
-    orderBy: { id: 'asc' }, // stable order so the cursor stays valid
-    take: page.take,
-    ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),
-  });
-  return { recipes: rows.map(toDTO) };
+export async function browse(
+  page: PageOpts = { take: 30 },
+  shape: RecipeShape = 'full',
+): Promise<{ recipes: Recipe[] }> {
+  const recipes = await findRecipes(
+    {
+      orderBy: { id: 'asc' }, // stable order so the cursor stays valid
+      take: page.take,
+      ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),
+    },
+    shape,
+  );
+  return { recipes };
 }
 
-export async function getRandom(count: number): Promise<Recipe[]> {
+export async function getRandom(count: number, shape: RecipeShape = 'full'): Promise<Recipe[]> {
   try {
     const meals = await randomMeals(count);
     if (meals.length > 0) {
@@ -238,12 +304,7 @@ export async function getRandom(count: number): Promise<Recipe[]> {
   const ids = await prisma.$queryRaw<{ id: string }[]>`
     SELECT id FROM "Recipe" ORDER BY random() LIMIT ${count}
   `;
-  if (ids.length === 0) return [];
-  const rows = await prisma.recipe.findMany({
-    where: { id: { in: ids.map((r) => r.id) } },
-    include: { ingredients: true },
-  });
-  return rows.map(toDTO);
+  return recipesByIds(ids.map((r) => r.id), shape);
 }
 
 // ponytail: per-process sync marker — re-syncs a cuisine once per API restart (upserts are cheap)
@@ -256,6 +317,7 @@ const MAX_SYNCED_CUISINES = 200;
 export async function getByCuisine(
   cuisine: string,
   page: PageOpts = { take: 20 },
+  shape: RecipeShape = 'full',
 ): Promise<Recipe[]> {
   if (!syncedCuisines.has(cuisine) && syncedCuisines.size < MAX_SYNCED_CUISINES) {
     // Claim it before awaiting: otherwise two concurrent requests for the same
@@ -270,23 +332,29 @@ export async function getByCuisine(
       console.warn(`[mealdb] cuisine sync failed for "${cuisine}":`, (err as Error).message);
     }
   }
-  const rows = await prisma.recipe.findMany({
-    where: { cuisine: { in: cuisineMembers(cuisine) } },
-    orderBy: [{ name: 'asc' }, { id: 'asc' }],
-    include: { ingredients: true },
-    take: page.take,
-    ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),
-  });
-  return rows.map(toDTO);
+  return findRecipes(
+    {
+      where: { cuisine: { in: cuisineMembers(cuisine) } },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+      take: page.take,
+      ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),
+    },
+    shape,
+  );
 }
 
 /** Cuisines available for browsing: what actually has recipes in the DB.
  *  (TheMealDB's area list has ~195 entries, most empty — not usable as chips.) */
 export async function listCuisines(): Promise<string[]> {
-  const db = await prisma.recipe.findMany({ select: { cuisine: true }, distinct: ['cuisine'] });
-  const chips = db.map((r) => cuisineFamily(r.cuisine)).filter((c) => c && c !== 'Unknown');
-  return [...new Set(chips)].sort();
+  // The chips change only when recipes are imported; a minute's staleness is
+  // invisible, and it saves a DISTINCT over the recipe table per screen open.
+  return cuisineCache.getOrLoad('all', async () => {
+    const db = await prisma.recipe.findMany({ select: { cuisine: true }, distinct: ['cuisine'] });
+    const chips = db.map((r) => cuisineFamily(r.cuisine)).filter((c) => c && c !== 'Unknown');
+    return [...new Set(chips)].sort();
+  });
 }
+const cuisineCache = new TtlCache<'all', string[]>(60_000, 1);
 
 export async function getById(id: string): Promise<Recipe | null> {
   const r = await prisma.recipe.findUnique({

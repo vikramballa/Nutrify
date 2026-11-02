@@ -1,17 +1,18 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/prisma.js';
-import { toDTO } from '../services/recipeService.js';
+import { recipesByIds, shapeParam } from '../services/recipeService.js';
 import { logEvent } from '../services/taste.js';
 
 export async function favoriteRoutes(app: FastifyInstance) {
-  app.get('/favorites', async (req) => {
+  app.get<{ Querystring: { fields?: string } }>('/favorites', async (req) => {
     const favs = await prisma.favorite.findMany({
       where: { userId: req.userId },
       orderBy: { createdAt: 'desc' },
-      include: { recipe: { include: { ingredients: true } } },
+      select: { recipeId: true },
       take: 200,
     });
-    return { recipes: favs.map((f) => toDTO(f.recipe)) };
+    // Newest favourite first, in whichever shape the client asked for.
+    return { recipes: await recipesByIds(favs.map((f) => f.recipeId), shapeParam(req.query.fields)) };
   });
 
   // Toggle: saved → unsaved → saved.

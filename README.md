@@ -165,7 +165,7 @@ Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env` to match where the app runs:
 ## Development
 
 ```bash
-npm test                                    # vitest across all workspaces (DB-free)
+npm test                                    # vitest across all workspaces (DB tests opt-in, below)
 npm run typecheck                           # API
 npx tsc --noEmit -p apps/mobile/tsconfig.json
 npm run build                               # shared → api (prisma generate + tsc)
@@ -184,6 +184,31 @@ npm run db:seed:reviewer -w apps/api                    # App Review demo accoun
 ```
 
 Always use migrations. **Never `prisma db push`**.
+
+**Database tests.** `apps/api/test/db` runs against a real Postgres: query
+results, the exact indexes, and that no index is left half-built. They are
+opt-in so a plain `npm test` never writes to your database; CI runs them on
+every push against a fresh database, after applying every migration and
+checking that `schema.prisma` matches them.
+
+```bash
+export DATABASE_URL=postgresql://nutrichef:nutrichef@localhost:5432/nutrichef_test DB_TESTS=1
+npm exec -w apps/api -- prisma migrate deploy && npm test -w apps/api
+```
+
+**New indexes on live tables** go in their own migration file, one statement
+each, as `CREATE INDEX CONCURRENTLY` (Postgres refuses it inside a
+transaction), so the app keeps reading and writing while the index builds.
+
+**Finding slow queries.** The API warns about any query over `SLOW_QUERY_MS`
+(default 200 ms). The compose Postgres also loads `pg_stat_statements`; the
+heaviest queries overall are:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;  -- once
+SELECT calls, round(total_exec_time) AS total_ms, round(mean_exec_time, 1) AS mean_ms, query
+FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 20;
+```
 
 ### Brand assets
 

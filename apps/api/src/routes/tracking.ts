@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { AddWaterSchema, UpsertWeightSchema } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
 import { computeDailyTotals, dayRange, resolveDay } from '../services/tracking.js';
+import { dailyMacroTotals } from '../services/logQueries.js';
 import { dayKey } from '../services/mealplan.js';
 import { intParam } from '../lib/query.js';
 
@@ -87,11 +88,8 @@ export async function trackingRoutes(app: FastifyInstance) {
   // doesn't recompute them.
   app.get<{ Querystring: { days?: string } }>('/progress/summary', async (req) => {
     const range = dayRange(intParam(req.query.days, 7, 90));
-    const logs = await prisma.mealLog.findMany({
-      where: { userId: req.userId, at: { gte: range.start, lt: range.endExclusive } },
-      select: { at: true, calories: true, protein: true, carbs: true, fat: true },
-      take: 5000,
-    });
+    // Summed per day in Postgres: at most `days` rows instead of every log.
+    const logs = await dailyMacroTotals(req.userId, range.start, range.endExclusive);
     return { days: computeDailyTotals(range.days, logs) };
   });
 }

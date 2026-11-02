@@ -16,9 +16,11 @@ import { CookInstructions } from '../components/CookInstructions';
 import { splitSteps } from '../components/cookSteps';
 import { IngredientsList } from '../components/IngredientsList';
 import { BottomSheet } from '../components/BottomSheet';
+import { ErrorState } from '../components/States';
 import { useInsights, useNutrition } from '../hooks/useInsights';
 import { useLogMeal, currentMealType } from '../hooks/useLogs';
 import { useFavorites, useToggleFavorite } from '../hooks/useFavorites';
+import { useFullRecipe } from '../hooks/useRecipes';
 import type { RootStackParamList } from '../navigation/types';
 
 function ActionButton({
@@ -76,7 +78,10 @@ const portionLabel = (p: number) =>
 export function RecipeDetailScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
-  const { recipe } = useRoute<RouteProp<RootStackParamList, 'RecipeDetail'>>().params;
+  const { recipe: card } = useRoute<RouteProp<RootStackParamList, 'RecipeDetail'>>().params;
+  // Lists send a card; the header renders from it at once while the
+  // ingredients and steps load.
+  const { recipe, complete, failed, retry } = useFullRecipe(card);
   const insights = useInsights(recipe.id);
   const nutrition = useNutrition(recipe.id);
 
@@ -198,7 +203,8 @@ export function RecipeDetailScreen() {
             <ActionButton
               icon="cart-outline"
               label="Shop"
-              onPress={() => nav.navigate('ShopRecipe', { recipe })}
+              busy={!complete && !failed}
+              onPress={() => complete && nav.navigate('ShopRecipe', { recipe })}
             />
           </FadeIn>
 
@@ -252,11 +258,23 @@ export function RecipeDetailScreen() {
             </Card>
           )}
 
-          {/* Ingredients */}
-          <IngredientsList items={recipe.ingredients} />
+          {complete ? (
+            <>
+              {/* Ingredients */}
+              <IngredientsList items={recipe.ingredients} />
 
-          {/* Instructions — interactive cook mode */}
-          <CookInstructions steps={paragraphs.map((p) => p.trim())} />
+              {/* Instructions — interactive cook mode */}
+              <CookInstructions steps={paragraphs.map((p) => p.trim())} />
+            </>
+          ) : failed ? (
+            <ErrorState onRetry={() => void retry()} />
+          ) : (
+            <Card style={styles.recipeSkeleton}>
+              {[0.6, 0.9, 0.8, 0.85, 0.7, 0.9].map((w, i) => (
+                <Skeleton key={i} width={`${w * 100}%`} height={14} borderRadius={7} />
+              ))}
+            </Card>
+          )}
         </View>
       </Animated.ScrollView>
 
@@ -360,6 +378,7 @@ function SheetChip({ label, active, onPress }: { label: string; active: boolean;
 }
 
 const styles = StyleSheet.create({
+  recipeSkeleton: { padding: 20, gap: 12 },
   sheetSection: { gap: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
