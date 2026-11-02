@@ -20,6 +20,7 @@ import { foodRoutes } from './routes/foods.js';
 import { legalRoutes } from './routes/legal.js';
 import { verifyAccessToken } from './lib/auth.js';
 import { loadAuthUser } from './lib/authUser.js';
+import { runRetentionSweep } from './services/retention.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -114,22 +115,19 @@ await app.register(trackingRoutes, { prefix: '/api/v1' });
 await app.register(assistantRoutes, { prefix: '/api/v1' });
 await app.register(foodRoutes, { prefix: '/api/v1' });
 
-// UserEvent gains a row per suggestion shown and RefreshToken a row per login,
-// and neither was ever pruned — both grow without bound. The taste engine only
-// looks 90 days back and a refresh token dies at 30 days, so anything older is
-// pure storage cost. ponytail: in-process timer, one sweep a day; move to a
-// real scheduler if the API ever runs more than one instance.
+// Daily clean-up of rows nothing reads any more (old events, expired tokens,
+// stale suggestion counts, chat beyond the per-user cap); see retention.ts.
+// ponytail: in-process timer, one sweep a day; move to a real scheduler if
+// the API ever runs more than one instance.
 const RETENTION_SWEEP_MS = 24 * 60 * 60 * 1000;
-const EVENT_RETENTION_DAYS = 90;
 
 async function sweepExpiredRows() {
-  const eventCutoff = new Date(Date.now() - EVENT_RETENTION_DAYS * 86_400_000);
   try {
-    const [events, tokens] = await Promise.all([
-      prisma.userEvent.deleteMany({ where: { createdAt: { lt: eventCutoff } } }),
-      prisma.refreshToken.deleteMany({ where: { expiresAt: { lt: new Date() } } }),
-    ]);
-    app.log.info(`retention sweep: ${events.count} events, ${tokens.count} refresh tokens removed`);
+    const r = await runRetentionSweep();
+    app.log.info(
+      `retention sweep: ${r.events} events, ${r.refreshTokens} refresh tokens, ` +
+        `${r.suggestions} suggestion counts, ${r.chatMessages} chat messages removed`,
+    );
   } catch (err) {
     app.log.warn({ err }, 'retention sweep failed');
   }

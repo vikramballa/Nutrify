@@ -39,6 +39,7 @@ model User {
   refreshTokens RefreshToken[]
   chatMessages ChatMessage[]
   mealScanCorrections MealScanCorrection[]
+  recipeSuggestions RecipeSuggestion[]
   createdAt    DateTime        @default(now())
 }
 
@@ -176,6 +177,25 @@ model FoodProduct {
   createdAt    DateTime @default(now())
 }
 
+// How often a recipe was recommended to a user: one row per (user, recipe),
+// counted up in place. It replaces a UserEvent row per recipe per
+// recommendation, which made 'suggest' the bulk of that table. The count
+// restarts when the last suggestion is older than the taste window, so
+// "suggested N times and ignored" keeps meaning "recently".
+model RecipeSuggestion {
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipeId String
+  recipe   Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  count    Int      @default(1)
+  firstAt  DateTime @default(now())
+  lastAt   DateTime @default(now())
+
+  @@id([userId, recipeId])
+  @@index([userId, lastAt])
+  @@index([recipeId])
+}
+
 // Implicit-feedback log driving recommendations: every search, recipe view,
 // grocery add and chat message becomes a weighted taste signal.
 model UserEvent {
@@ -188,11 +208,8 @@ model UserEvent {
   weight    Float
   createdAt DateTime @default(now())
 
-  @@index([userId, createdAt])
-  // The taste engine reads one type at a time ('suggest' penalties, 'view'
-  // history). suggest rows are written on every recommendation and outnumber
-  // real signals, so filtering type after the (userId, createdAt) range scan
-  // walks all of them.
+  // Every read is by user and type (signals, 'view' history), newest first;
+  // this index serves them all, so (userId, createdAt) was dropped.
   @@index([userId, type, createdAt])
   // (No recipeId index: recipeId has no foreign key and no query filters on
   // it alone, so it was pure write cost on the busiest table.)
@@ -290,6 +307,7 @@ model Recipe {
   favorites    Favorite[]
   mealPlanEntries MealPlanEntry[]
   groceryItems GroceryItem[]
+  suggestions  RecipeSuggestion[]
   createdAt    DateTime       @default(now())
 
   // by-cuisine pages ORDER BY name, id — the composite serves filter and

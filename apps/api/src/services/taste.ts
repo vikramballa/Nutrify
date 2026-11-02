@@ -26,7 +26,9 @@ export const EVENT_WEIGHTS = {
   // likes, so a rejected dish kept resurfacing until the weak ignored-penalty
   // caught up. An explicit "not for me" outweighs a passing view.
   dislike: -6,
-  suggest: 0, // recorded only so we can detect ignored suggestions
+  // Weight 0, never a signal. Older databases hold 'suggest' rows from before
+  // RecipeSuggestion counted them; they age out with retention.
+  suggest: 0,
 } as const;
 export type EventType = keyof typeof EVENT_WEIGHTS;
 
@@ -181,14 +183,34 @@ async function signalEvents(userId: string): Promise<TasteEvent[]> {
   });
 }
 
+/**
+ * Count one more suggestion of each recipe for this user, in one statement.
+ * A count whose last suggestion fell out of the taste window starts over at 1,
+ * so it measures recent ignoring, as the 90-day event window did. Recipes
+ * deleted since the (5-minute cached) index was built are skipped.
+ */
+export async function recordSuggestions(userId: string, recipeIds: string[]): Promise<void> {
+  const ids = [...new Set(recipeIds)];
+  if (ids.length === 0) return;
+  const windowStart = new Date(Date.now() - EVENT_WINDOW_DAYS * 86_400_000);
+  await prisma.$executeRaw`
+    INSERT INTO "RecipeSuggestion" ("userId", "recipeId", "count", "firstAt", "lastAt")
+    SELECT ${userId}, r."id", 1, now(), now()
+    FROM "Recipe" r WHERE r."id" = ANY(${ids}::text[])
+    ON CONFLICT ("userId", "recipeId") DO UPDATE SET
+      "count"   = CASE WHEN "RecipeSuggestion"."lastAt" < ${windowStart} THEN 1 ELSE "RecipeSuggestion"."count" + 1 END,
+      "firstAt" = CASE WHEN "RecipeSuggestion"."lastAt" < ${windowStart} THEN now() ELSE "RecipeSuggestion"."firstAt" END,
+      "lastAt"  = now()
+  `;
+}
+
 /** How often each recipe was suggested but never opened, within the window. */
 async function ignoredCounts(userId: string): Promise<Map<string, number>> {
   const since = new Date(Date.now() - EVENT_WINDOW_DAYS * 86_400_000);
   const [suggested, viewed] = await Promise.all([
-    prisma.userEvent.groupBy({
-      by: ['recipeId'],
-      where: { userId, type: 'suggest', recipeId: { not: null }, createdAt: { gte: since } },
-      _count: { recipeId: true },
+    prisma.recipeSuggestion.findMany({
+      where: { userId, lastAt: { gte: since } },
+      select: { recipeId: true, count: true },
     }),
     prisma.userEvent.findMany({
       where: { userId, type: 'view', recipeId: { not: null }, createdAt: { gte: since } },
@@ -199,7 +221,7 @@ async function ignoredCounts(userId: string): Promise<Map<string, number>> {
   const opened = new Set(viewed.map((v) => v.recipeId));
   const counts = new Map<string, number>();
   for (const row of suggested) {
-    if (row.recipeId && !opened.has(row.recipeId)) counts.set(row.recipeId, row._count.recipeId);
+    if (!opened.has(row.recipeId)) counts.set(row.recipeId, row.count);
   }
   return counts;
 }
@@ -310,16 +332,9 @@ export async function recommend(
   const recipes = await recipesByIds(picks.map((p) => p.recipeId), shape);
 
   // Remember what we showed, so ignoring it becomes a negative signal.
-  prisma.userEvent
-    .createMany({
-      data: picks.map((p) => ({
-        userId,
-        type: 'suggest',
-        recipeId: p.recipeId,
-        weight: 0,
-      })),
-    })
-    .catch((err) => console.warn('[taste] suggest log failed:', (err as Error).message));
+  recordSuggestions(userId, picks.map((p) => p.recipeId)).catch((err) =>
+    console.warn('[taste] suggest log failed:', (err as Error).message),
+  );
 
   // The scoring already knows why each recipe won; throwing that away and
   // showing a bare grid is what made the whole engine feel like a random feed.
