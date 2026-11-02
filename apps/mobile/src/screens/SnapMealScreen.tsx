@@ -23,9 +23,11 @@ import { Screen } from '../components/Screen';
 import { Card } from '../components/Card';
 import { useLogCustomMeal, currentMealType } from '../hooks/useLogs';
 import { useAiConsent } from '../hooks/useAiConsent';
+import { BottomSheet } from '../components/BottomSheet';
 import {
   useAnalyzeMealPhoto,
   useAnalyzeNutritionLabel,
+  useMealScanFeedback,
   type MealPhotoAnalysisResult,
   type NutritionLabelAnalysisResult,
 } from '../hooks/useAssistant';
@@ -36,6 +38,12 @@ const MAX_EDGE = 1024;
 const JPEG_QUALITY = 0.7;
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+/**
+ * The user's answer to "Is this right?" on a meal scan. Logging options stay
+ * hidden while it is 'pending', so a wrong dish isn't logged by accident.
+ */
+type Verdict = 'pending' | 'yes' | 'corrected';
 
 /** Which scanner is active: a cooked plate (AI estimate) or a packaged label (OCR, ground truth). */
 type ScanMode = 'meal' | 'label';
@@ -124,11 +132,17 @@ export function SnapMealScreen() {
   const [grams, setGrams] = useState(100);
   const [customGrams, setCustomGrams] = useState('');
   const [reading, setReading] = useState(false);
+  // Meal scans: "Is this right?" and the rename dialog behind "No".
+  const [verdict, setVerdict] = useState<Verdict>('pending');
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameText, setRenameText] = useState('');
+  const [renameNote, setRenameNote] = useState<string | null>(null);
 
   const analyzeMeal = useAnalyzeMealPhoto();
   const analyzeLabel = useAnalyzeNutritionLabel();
   const analyze = mode === 'meal' ? analyzeMeal : analyzeLabel;
   const logMeal = useLogCustomMeal();
+  const feedback = useMealScanFeedback();
 
   const result = mode === 'meal' ? mealResult : labelResult;
 
@@ -141,6 +155,11 @@ export function SnapMealScreen() {
     setPickError(null);
     setLabelName('');
     setCustomGrams('');
+    setVerdict('pending');
+    setRenameOpen(false);
+    setRenameText('');
+    setRenameNote(null);
+    feedback.reset();
     analyzeMeal.reset();
     analyzeLabel.reset();
     logMeal.reset();
@@ -221,6 +240,8 @@ export function SnapMealScreen() {
     setMealResult(null);
     setLabelResult(null);
     setLogged(false);
+    setVerdict('pending');
+    setRenameNote(null);
     try {
       if (mode === 'meal') {
         setMealResult(await analyzeMeal.mutateAsync(await toDataUrl(uri)));
@@ -233,6 +254,58 @@ export function SnapMealScreen() {
       // The active mutation holds the error; the render below reads it.
     }
   }
+
+  /** "Yes, that's it": reinforces a learned name; nothing to wait for. */
+  function confirmDish() {
+    if (!mealResult) return;
+    setVerdict('yes');
+    feedback.mutate({ predictedName: mealResult.modelName ?? mealResult.name, correct: true });
+  }
+
+  function openRename() {
+    setRenameText('');
+    feedback.reset();
+    setRenameOpen(true);
+  }
+
+  /**
+   * "No, it's X": the API remembers X against the model's wording (so the
+   * next scan it would call the same comes back as X) and re-reads the photo
+   * as X so the items and macros match the real dish.
+   */
+  async function submitRename() {
+    const name = renameText.trim();
+    if (!mealResult || !name) return;
+    let image: string | undefined;
+    try {
+      if (photo) image = await toDataUrl(photo);
+    } catch {
+      // Re-encoding failed: still save the lesson, just without re-estimating.
+    }
+    try {
+      const res = await feedback.mutateAsync({
+        predictedName: mealResult.modelName ?? mealResult.name,
+        correct: false,
+        correctName: name,
+        image,
+      });
+      if (res.analysis) {
+        setMealResult(res.analysis);
+        setRenameNote(`Updated for ${name}. NutriChef will remember this next time.`);
+      } else {
+        setMealResult({ ...mealResult, name, learned: false });
+        setRenameNote(
+          `Saved as ${name}, and NutriChef will remember it. The numbers are still the first estimate, so check them.`,
+        );
+      }
+      setVerdict('corrected');
+      setRenameOpen(false);
+    } catch {
+      // The mutation holds the error; the dialog shows it.
+    }
+  }
+
+  const awaitingVerdict = mode === 'meal' && !!mealResult && verdict === 'pending';
 
   // Per-100 g labels are logged by grams eaten, everything else by portions.
   const per100 = mode === 'label' ? labelResult?.per100g : undefined;
@@ -393,6 +466,12 @@ export function SnapMealScreen() {
                         accessibilityLabel="Food name"
                       />
                     )}
+                    {mode === 'meal' && mealResult?.learned && (
+                      <View style={styles.learnedRow}>
+                        <Ionicons name="school-outline" size={12} color={colors.primary} />
+                        <Text style={styles.learnedText}>Named from your earlier correction</Text>
+                      </View>
+                    )}
                     <Text style={[type.caption, styles.captionTop]}>
                       {mode === 'meal'
                         ? `Estimated for ${portion === 1 ? 'the plate shown' : `${portion}× the plate`}`
@@ -444,6 +523,51 @@ export function SnapMealScreen() {
               </Card>
             </FadeIn>
 
+            {mode === 'meal' && mealResult && (
+              <FadeIn delay={90}>
+                {verdict === 'pending' ? (
+                  <Card style={styles.verdictCard}>
+                    <Text style={type.body}>
+                      Is this <Text style={styles.verdictName}>{mealResult.name}</Text>?
+                    </Text>
+                    <View style={styles.verdictRow}>
+                      <PressableScale
+                        onPress={confirmDish}
+                        haptic
+                        style={[styles.verdictButton, styles.verdictYes]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Yes, the dish is correct"
+                      >
+                        <Ionicons name="checkmark" size={18} color="#fff" />
+                        <Text style={[styles.verdictLabel, styles.onPrimary]}>Yes</Text>
+                      </PressableScale>
+                      <PressableScale
+                        onPress={openRename}
+                        style={[styles.verdictButton, styles.verdictNo]}
+                        accessibilityRole="button"
+                        accessibilityLabel="No, the dish is wrong"
+                      >
+                        <Ionicons name="close" size={18} color={colors.primary} />
+                        <Text style={[styles.verdictLabel, styles.onSecondary]}>No</Text>
+                      </PressableScale>
+                    </View>
+                  </Card>
+                ) : (
+                  <View style={styles.verdictDone}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                    <Text style={[type.caption, styles.flex1]}>
+                      {verdict === 'yes' ? 'Dish confirmed.' : renameNote}
+                    </Text>
+                    <PressableScale onPress={openRename} accessibilityRole="button">
+                      <Text style={styles.renameLink}>Rename</Text>
+                    </PressableScale>
+                  </View>
+                )}
+              </FadeIn>
+            )}
+
+            {!awaitingVerdict && (
+            <>
             <FadeIn delay={110}>
               <Text style={[type.eyebrow, styles.eyebrow]}>HOW MUCH DID YOU EAT</Text>
               <View style={styles.chipRow}>
@@ -575,9 +699,50 @@ export function SnapMealScreen() {
                 <Notice tone="error" text="Could not log that meal. Try again." />
               )}
             </FadeIn>
+            </>
+            )}
           </>
         )}
       </ScrollView>
+
+      <BottomSheet
+        visible={renameOpen}
+        title="What is this dish?"
+        subtitle="Type the right name. NutriChef re-checks the photo and remembers it for your next scan."
+        onClose={() => !feedback.isPending && setRenameOpen(false)}
+      >
+        <TextInput
+          value={renameText}
+          onChangeText={setRenameText}
+          placeholder="e.g. Gongura chicken"
+          placeholderTextColor={colors.textTertiary}
+          maxLength={80}
+          autoFocus
+          returnKeyType="done"
+          onSubmitEditing={submitRename}
+          editable={!feedback.isPending}
+          style={styles.renameInput}
+          accessibilityLabel="Correct dish name"
+        />
+        {feedback.isError && (
+          <Notice tone="error" text="Couldn't save that. Check your connection and try again." />
+        )}
+        <PressableScale
+          onPress={submitRename}
+          haptic
+          disabled={!renameText.trim() || feedback.isPending}
+          style={[styles.saveButton, !renameText.trim() && styles.saveButtonDisabled]}
+        >
+          {feedback.isPending ? (
+            <>
+              <ActivityIndicator color="#fff" />
+              <Text style={styles.saveLabel}>Re-checking the photo…</Text>
+            </>
+          ) : (
+            <Text style={styles.saveLabel}>Save name</Text>
+          )}
+        </PressableScale>
+      </BottomSheet>
     </Screen>
   );
 }
@@ -949,6 +1114,38 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   saveButtonDone: { backgroundColor: colors.success, shadowOpacity: 0 },
+  saveButtonDisabled: { opacity: 0.5 },
+
+  verdictCard: { padding: 16, gap: 12 },
+  verdictName: { fontFamily: fonts.semibold, color: colors.textPrimary },
+  verdictRow: { flexDirection: 'row', gap: 10 },
+  verdictButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: radii.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  verdictYes: { backgroundColor: colors.primary },
+  verdictNo: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primaryLight },
+  verdictLabel: { fontFamily: fonts.semibold, fontSize: 15 },
+  verdictDone: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 },
+  renameLink: { fontFamily: fonts.semibold, fontSize: 13, color: colors.primary },
+  renameInput: {
+    height: 50,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    fontFamily: fonts.medium,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  learnedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  learnedText: { fontFamily: fonts.medium, fontSize: 12, color: colors.primary },
   saveLabel: { fontFamily: fonts.semibold, fontSize: 16, color: '#fff' },
   againButton: { alignItems: 'center', paddingVertical: 14 },
   againLabel: { fontFamily: fonts.semibold, fontSize: 14, color: colors.primary },

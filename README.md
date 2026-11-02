@@ -47,7 +47,7 @@ first-class.
 
 | | |
 | --- | --- |
-| 📸 **Scan a meal** | Photograph your plate. A vision model names each item with its grams (and pieces: "3 idli"), then NutriChef's own food tables price every item they know, so the calories don't depend on the model's arithmetic. |
+| 📸 **Scan a meal** | Photograph your plate. A vision model names each item with its grams (and pieces: "3 idli"), then NutriChef's own food tables price every item they know, so the calories don't depend on the model's arithmetic. Then it asks **"Is this right?"**: tap **No**, type the real dish, and the photo is re-estimated as that dish. The correction is remembered, so the next scan the model would misname the same way comes back with your name. |
 | 🏷️ **Nutrition labels** | Read **on the phone** with Apple's built-in text recognition: free, offline, no AI permission. Handles US panels and Indian/FSSAI "per 100 g" tables, kJ and decimal commas; pick how many grams you ate. Falls back to the vision model only when the text doesn't add up. **Barcodes** via Open Food Facts. |
 | 🍛 **Indian food** | ~200 prepared dishes (tiffins, curries, rice, breads, snacks, sweets, drinks) and household units: "3 idli", "1 katori dal", "1 plate biryani", "dosa x2". 80 curated Indian recipes with declared servings; the **Indian** chip covers every regional cuisine. |
 | 🥘 **Cook from pantry** | List what's in your kitchen and get dishes ranked by how little is missing. Missing items go straight to the grocery list. |

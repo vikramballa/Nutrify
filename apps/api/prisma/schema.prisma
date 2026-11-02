@@ -38,7 +38,28 @@ model User {
   weightEntries WeightEntry[]
   refreshTokens RefreshToken[]
   chatMessages ChatMessage[]
+  mealScanCorrections MealScanCorrection[]
   createdAt    DateTime        @default(now())
+}
+
+// What the user taught the meal scanner: "when you say X, it's actually Y".
+// Keyed on the model's own wording, normalised (see mealCorrections.ts), so
+// the next scan that says X is renamed to Y and the prompt carries the hint.
+// The newest answer for a key wins; a "no" on a learned name replaces it.
+model MealScanCorrection {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  predictedKey  String
+  predictedName String
+  correctName   String
+  // How often a scan was renamed with this correction and the user said yes.
+  confirmations Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, predictedKey])
+  @@index([userId, updatedAt])
 }
 
 // One turn of the Ask NutriChef thread. A user has a single rolling

@@ -114,8 +114,17 @@ export const VISION_SYSTEM =
 // rows instead of near-misses ("steamed rice cake" for idli).
 const DISH_NAMES = Object.keys(DISHES).join(', ');
 
-export function visionUserPrompt(): string {
+/**
+ * `hints` = the user's past scan corrections (correctionHints). `dish` = the
+ * name the user just told us, when re-estimating a plate they said was wrong.
+ */
+export function visionUserPrompt(opts: { hints?: string; dish?: string } = {}): string {
+  const dish = opts.dish
+    ? `The user says this dish is "${opts.dish}". Use exactly that as "name", set ` +
+      'confidence to 1, and identify the items and amounts as that dish. '
+    : '';
   return (
+    dish +
     'Identify the meal in this photo and estimate its nutrition as eaten ' +
     '(the whole portion shown, not per 100 g). Respond with one JSON object:\n' +
     '{"name":string,"confidence":number,"items":[{"name":string,"grams":number,"count":number,' +
@@ -134,7 +143,8 @@ export function visionUserPrompt(): string {
     'sentence naming the biggest source of uncertainty (hidden oil, unknown ' +
     'portion depth, sauce). ' +
     'If the photo is not food, set name to "Not a meal", confidence to 0, ' +
-    'items to [] and every number to 0.'
+    'items to [] and every number to 0.' +
+    (opts.hints ?? '')
   );
 }
 

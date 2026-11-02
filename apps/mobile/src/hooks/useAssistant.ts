@@ -6,13 +6,43 @@ import {
   NutritionLabelAnalysisSchema,
   PantryResponseSchema,
   type CoachInsight,
+  type MealScanFeedback,
   type MealType,
   type PantryResponse,
 } from '@nutrichef/shared';
 import { apiFetch, parseWith, type ApiError } from '../api/client';
 
-const AnalysisResponseSchema = MealPhotoAnalysisSchema.extend({ provider: z.string() });
+const AnalysisResponseSchema = MealPhotoAnalysisSchema.extend({
+  provider: z.string(),
+  // The model's own dish name (feedback is keyed on it) and whether the name
+  // shown came from one of the user's past corrections.
+  modelName: z.string().optional(),
+  learned: z.boolean().optional(),
+});
 export type MealPhotoAnalysisResult = z.infer<typeof AnalysisResponseSchema>;
+
+const FeedbackResponseSchema = z.object({
+  saved: z.boolean(),
+  analysis: AnalysisResponseSchema.nullable(),
+});
+export type MealScanFeedbackResult = z.infer<typeof FeedbackResponseSchema>;
+
+/**
+ * "Is this right?" after a meal scan. On "no" with a name (and the photo),
+ * the API remembers the correction for next time and re-estimates the plate
+ * as that dish; `analysis` is null when it couldn't re-estimate.
+ */
+export function useMealScanFeedback() {
+  return useMutation<MealScanFeedbackResult, ApiError, MealScanFeedback>({
+    mutationFn: async (input) =>
+      parseWith(
+        FeedbackResponseSchema,
+        await apiFetch('/vision/meal/feedback', { method: 'POST', body: JSON.stringify(input) }),
+        'vision/meal/feedback',
+      ),
+    retry: false,
+  });
+}
 
 /** Photo (data URL) → dish name and per-plate macros. Nothing is logged yet. */
 export function useAnalyzeMealPhoto() {

@@ -4,6 +4,7 @@ import {
   AnalyzeNutritionLabelSchema,
   CoachInsightSchema,
   MealPhotoAnalysisSchema,
+  MealScanFeedbackSchema,
   NutritionLabelAnalysisSchema,
   PantryIdeaSchema,
   PantryRequestSchema,
@@ -31,6 +32,13 @@ import {
 import { adherenceScore, computeDailyTotals, dayRange } from '../services/tracking.js';
 import { logEvent } from '../services/taste.js';
 import { priceMealPhoto } from '../services/mealPhoto.js';
+import {
+  applyCorrection,
+  cleanDishName,
+  correctionHints,
+  correctionKey,
+  type Correction,
+} from '../services/mealCorrections.js';
 
 /** ~1.4 MB of base64 ≈ a 1 MB JPEG — above that the model call is not worth it. */
 const MAX_IMAGE_CHARS = 1_400_000;
@@ -39,6 +47,31 @@ const MAX_IMAGE_CHARS = 1_400_000;
 const IMAGE_BODY_LIMIT = 2 * 1024 * 1024;
 
 const COACH_DAYS = 7;
+
+/** Corrections kept per user; the oldest beyond this are dropped. */
+const MAX_CORRECTIONS = 200;
+
+/** The user's most recent scan corrections, newest first. */
+async function loadCorrections(userId: string): Promise<Correction[]> {
+  return prisma.mealScanCorrection.findMany({
+    where: { userId },
+    orderBy: { updatedAt: 'desc' },
+    select: { predictedKey: true, predictedName: true, correctName: true },
+    take: MAX_CORRECTIONS,
+  });
+}
+
+async function pruneCorrections(userId: string) {
+  const stale = await prisma.mealScanCorrection.findMany({
+    where: { userId },
+    orderBy: { updatedAt: 'desc' },
+    skip: MAX_CORRECTIONS,
+    select: { id: true },
+  });
+  if (stale.length) {
+    await prisma.mealScanCorrection.deleteMany({ where: { id: { in: stale.map((s) => s.id) } } });
+  }
+}
 
 /** The user row every AI route here needs for `profileContext`. */
 async function loadUser(userId: string) {
@@ -95,10 +128,13 @@ export async function assistantRoutes(app: FastifyInstance) {
         return reply.code(413).send({ error: 'image_too_large' });
       }
 
+      // What this user taught the scanner before: hints for the model, and
+      // exact renames applied to its answer below.
+      const corrections = await loadCorrections(req.userId);
       try {
         const { data, provider } = await aiJson(MealPhotoAnalysisSchema, {
           system: VISION_SYSTEM,
-          user: visionUserPrompt(),
+          user: visionUserPrompt({ hints: correctionHints(corrections) }),
           image: parsed.data.image,
           maxTokens: 900,
         });
@@ -107,10 +143,80 @@ export async function assistantRoutes(app: FastifyInstance) {
         if (data.confidence === 0 || data.calories === 0) {
           return reply.code(422).send({ error: 'not_a_meal' });
         }
-        logEvent(req.userId, 'search', { term: data.name });
-        return { ...(await priceMealPhoto(data)), provider };
+        const named = applyCorrection(data, corrections);
+        logEvent(req.userId, 'search', { term: named.name });
+        return { ...(await priceMealPhoto(named)), modelName: named.modelName, learned: named.learned, provider };
       } catch (err) {
         return sendAiError(reply, err);
+      }
+    },
+  );
+
+  /**
+   * The user's answer to "Is this right?" after a meal scan.
+   *  - yes: if the name shown was a learned rename, that lesson is reinforced.
+   *  - no:  the correct name is remembered against the model's wording, so the
+   *         next scan the model names the same way comes back corrected. With
+   *         the photo attached, the plate is re-estimated as that dish so the
+   *         items and macros match what the user actually ate.
+   * Nothing is logged here either; the app still posts to /logs/custom.
+   */
+  app.post<{ Body: unknown }>(
+    '/vision/meal/feedback',
+    { bodyLimit: IMAGE_BODY_LIMIT, preHandler: requireAiConsent, config: { rateLimit: { max: 20, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const parsed = MealScanFeedbackSchema.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'invalid_feedback' });
+      const { predictedName, correct, image } = parsed.data;
+      const predictedKey = correctionKey(predictedName);
+      if (!predictedKey) return reply.code(400).send({ error: 'invalid_feedback' });
+
+      if (correct) {
+        await prisma.mealScanCorrection.updateMany({
+          where: { userId: req.userId, predictedKey },
+          data: { confirmations: { increment: 1 } },
+        });
+        return { saved: true, analysis: null };
+      }
+
+      const correctName = cleanDishName(parsed.data.correctName ?? '');
+      if (!correctName) return reply.code(400).send({ error: 'invalid_feedback' });
+      if (image && image.length > MAX_IMAGE_CHARS) {
+        return reply.code(413).send({ error: 'image_too_large' });
+      }
+
+      // Telling us the model's own guess is "correct" just unlearns the rename.
+      if (correctionKey(correctName) === predictedKey) {
+        await prisma.mealScanCorrection.deleteMany({ where: { userId: req.userId, predictedKey } });
+      } else {
+        await prisma.mealScanCorrection.upsert({
+          where: { userId_predictedKey: { userId: req.userId, predictedKey } },
+          create: { userId: req.userId, predictedKey, predictedName: cleanDishName(predictedName), correctName },
+          update: { correctName, predictedName: cleanDishName(predictedName), confirmations: 0 },
+        });
+        await pruneCorrections(req.userId);
+      }
+      logEvent(req.userId, 'search', { term: correctName });
+
+      if (!image) return { saved: true, analysis: null };
+      try {
+        const { data, provider } = await aiJson(MealPhotoAnalysisSchema, {
+          system: VISION_SYSTEM,
+          user: visionUserPrompt({ dish: correctName }),
+          image,
+          maxTokens: 900,
+        });
+        // The user has the last word on the name, whatever the model echoed.
+        const priced = await priceMealPhoto({ ...data, name: correctName, confidence: 1 });
+        return {
+          saved: true,
+          analysis: { ...priced, modelName: predictedName, learned: false, provider },
+        };
+      } catch (err) {
+        // The lesson is saved either way; the app keeps the old numbers
+        // under the new name when the re-estimate can't be had.
+        req.log.warn({ err }, 'meal re-estimate failed');
+        return { saved: true, analysis: null };
       }
     },
   );

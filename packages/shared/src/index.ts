@@ -559,6 +559,29 @@ export const AnalyzeMealPhotoSchema = z.object({
 });
 export type AnalyzeMealPhoto = z.infer<typeof AnalyzeMealPhotoSchema>;
 
+/**
+ * The user's answer to "Is this right?" after a meal scan. `predictedName` is
+ * what the model itself said (before any learned correction was applied), so
+ * a correction is keyed on the model's wording and catches it next time.
+ * On "no", `correctName` is required; sending the photo back as `image` lets
+ * the API re-estimate the plate as that dish.
+ */
+export const MealScanFeedbackSchema = z
+  .object({
+    predictedName: z.string().trim().min(1).max(200),
+    correct: z.boolean(),
+    correctName: z.string().trim().min(1).max(80).optional(),
+    image: z
+      .string()
+      .regex(/^data:image\/(jpeg|jpg|png|webp);base64,/)
+      .optional(),
+  })
+  .refine((v) => v.correct || !!v.correctName, {
+    message: 'correctName is required when the scan was wrong',
+    path: ['correctName'],
+  });
+export type MealScanFeedback = z.infer<typeof MealScanFeedbackSchema>;
+
 // ---------------------------------------------------------------------------
 // Nutrition label scanner — packaged food, read the Nutrition Facts panel
 // ---------------------------------------------------------------------------
