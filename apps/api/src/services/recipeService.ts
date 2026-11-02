@@ -1,7 +1,8 @@
-import type { Ingredient as IngredientModel, Prisma, Recipe as RecipeModel } from '@prisma/client';
+import { Prisma, type Ingredient as IngredientModel, type Recipe as RecipeModel } from '@prisma/client';
 import { AIRecipeSchema, type Recipe, type RecipeShape, type SearchSource } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
 import { TtlCache } from '../lib/ttlCache.js';
+import { VISIBLE_RECIPE, VISIBLE_RECIPE_SQL } from './recipeQuality.js';
 import { extractJson } from '../lib/json.js';
 import { searchMeals, randomMeals, mealsByArea, type ParsedMeal } from './mealdb.js';
 import { aiComplete } from './ai/index.js';
@@ -183,7 +184,7 @@ export async function search(
   // 1. DB cache: name substring + exact SearchTerm mapping.
   const byName = await findRecipes(
     {
-      where: { nameLower: { contains: term } },
+      where: { nameLower: { contains: term }, ...VISIBLE_RECIPE },
       orderBy: { id: 'asc' },
       take: page.take,
       ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),
@@ -197,7 +198,11 @@ export async function search(
     ? null
     : await prisma.searchTerm.findUnique({ where: { term }, select: { recipeId: true } });
   const cache = new Map<string, Recipe>();
-  if (mapped) for (const r of await recipesByIds([mapped.recipeId], shape)) cache.set(r.id, r);
+  // A mapping to a hidden (rejected) AI recipe is ignored, so the search
+  // falls through and a new recipe takes the term over.
+  if (mapped) {
+    for (const r of await findRecipes({ where: { id: mapped.recipeId, ...VISIBLE_RECIPE } }, shape)) cache.set(r.id, r);
+  }
   for (const r of byName) cache.set(r.id, r);
   if (cache.size > 0) {
     return { recipes: [...cache.values()].slice(0, page.take), source: 'cache' };
@@ -214,7 +219,23 @@ export async function search(
     console.warn('[mealdb] search failed:', (err as Error).message);
   }
 
-  // 3. AI generation.
+  // 3. A close spelling of a recipe we already have ("gongura chiken",
+  //    "veg fried rice"). Generating would add a near-duplicate to the shared
+  //    library and cost a model call; the term is mapped to the match so the
+  //    next search for it is an exact hit.
+  if (!page.cursor) {
+    const similar = await similarRecipes(term, page.take, shape);
+    if (similar.length > 0) {
+      await prisma.searchTerm.upsert({
+        where: { term },
+        update: { recipeId: similar[0].id },
+        create: { term, recipeId: similar[0].id },
+      });
+      return { recipes: similar, source: 'cache' };
+    }
+  }
+
+  // 4. AI generation.
   try {
     const { content, provider } = await aiComplete({
       system: RECIPE_SYSTEM,
@@ -263,8 +284,29 @@ export async function search(
     console.warn('[ai] generation failed:', (err as Error).message);
   }
 
-  // 4. Nothing worked — a normal "not found".
+  // 5. Nothing worked — a normal "not found".
   return { recipes: [], source: 'none' };
+}
+
+/**
+ * Trigram similarity at which two dish names are the same dish. Measured on
+ * real pairs: typos and reworded names score 0.52-1.0 ("chiken biriyani",
+ * "masla dosa", "veg fried rice"); different dishes 0.22-0.47 ("chicken
+ * curry" vs "chicken biryani" 0.38). Erring low just means an AI recipe.
+ */
+export const SAME_DISH_SIMILARITY = 0.5;
+
+/** Recipes whose name is a close spelling of `term`, closest first. */
+export async function similarRecipes(term: string, take: number, shape: RecipeShape = 'full'): Promise<Recipe[]> {
+  // `%` (similarity above pg_trgm's 0.3 default) can use the trigram GIN
+  // index on nameLower; the explicit threshold then keeps only the close ones.
+  const rows = await prisma.$queryRaw<{ id: string }[]>`
+    SELECT r."id" FROM "Recipe" r
+    WHERE r."nameLower" % ${term} AND similarity(r."nameLower", ${term}) >= ${SAME_DISH_SIMILARITY}
+      AND ${Prisma.raw(VISIBLE_RECIPE_SQL)}
+    ORDER BY similarity(r."nameLower", ${term}) DESC, r."id"
+    LIMIT ${take}`;
+  return recipesByIds(rows.map((r) => r.id), shape);
 }
 
 /**
@@ -277,6 +319,7 @@ export async function browse(
 ): Promise<{ recipes: Recipe[] }> {
   const recipes = await findRecipes(
     {
+      where: VISIBLE_RECIPE,
       orderBy: { id: 'asc' }, // stable order so the cursor stays valid
       take: page.take,
       ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),
@@ -302,7 +345,7 @@ export async function getRandom(count: number, shape: RecipeShape = 'full'): Pro
   // ponytail: ORDER BY random() scans the table — fine for a recipe corpus of
   // this size; switch to a random-offset sample if it ever gets large.
   const ids = await prisma.$queryRaw<{ id: string }[]>`
-    SELECT id FROM "Recipe" ORDER BY random() LIMIT ${count}
+    SELECT r.id FROM "Recipe" r WHERE ${Prisma.raw(VISIBLE_RECIPE_SQL)} ORDER BY random() LIMIT ${count}
   `;
   return recipesByIds(ids.map((r) => r.id), shape);
 }
@@ -334,7 +377,7 @@ export async function getByCuisine(
   }
   return findRecipes(
     {
-      where: { cuisine: { in: cuisineMembers(cuisine) } },
+      where: { cuisine: { in: cuisineMembers(cuisine) }, ...VISIBLE_RECIPE },
       orderBy: [{ name: 'asc' }, { id: 'asc' }],
       take: page.take,
       ...(page.cursor ? { cursor: { id: page.cursor }, skip: 1 } : {}),

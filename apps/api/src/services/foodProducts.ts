@@ -3,9 +3,9 @@ import { prisma } from '../lib/prisma.js';
 
 /**
  * Packaged food by barcode, from Open Food Facts: free, open data, no key.
- * Every hit is cached forever in FoodProduct, so OFF sees each barcode once
+ * Every hit is cached in FoodProduct, so OFF sees each barcode about once
  * and a product scanned before keeps working when OFF is slow or down.
- * Misses are not cached — products are added to OFF all the time.
+ * See lookupBarcode for how hits are refreshed and misses remembered.
  */
 
 const OFF_URL = 'https://world.openfoodfacts.org/api/v2/product';
@@ -86,11 +86,15 @@ export function toFoodProductDTO(p: {
   };
 }
 
-/** Cache → OFF. Null when OFF has no such product (or no calories for it). */
-export async function lookupBarcode(barcode: string): Promise<FoodProduct | null> {
-  const cached = await prisma.foodProduct.findUnique({ where: { barcode } });
-  if (cached) return toFoodProductDTO(cached);
+/** A "not found" from OFF is trusted this long before asking again. */
+export const MISS_TTL_DAYS = 7;
+/** Cached product data older than this is refreshed in the background. */
+export const REFRESH_AFTER_DAYS = 180;
 
+const ageDays = (d: Date) => (Date.now() - d.getTime()) / 86_400_000;
+
+/** OFF's product, parsed; null when OFF has none (or none with calories). */
+async function fetchOff(barcode: string): Promise<ParsedProduct | null> {
   let res: Response;
   try {
     res = await fetch(`${OFF_URL}/${barcode}.json?fields=${FIELDS}`, {
@@ -102,14 +106,64 @@ export async function lookupBarcode(barcode: string): Promise<FoodProduct | null
   }
   if (res.status === 404) return null;
   if (!res.ok) throw new FoodLookupUnavailableError(`OFF responded ${res.status}`);
+  return parseOffProduct(await res.json());
+}
 
-  const parsed = parseOffProduct(await res.json());
-  if (!parsed) return null;
+// Barcodes being refreshed right now, so a popular product scanned by many
+// users at once is fetched once.
+const refreshing = new Set<string>();
+
+/**
+ * Re-read a stale product from OFF. Never throws and never deletes: if OFF
+ * dropped the product, the data users already log against is kept and simply
+ * marked as checked.
+ */
+export async function refreshProduct(barcode: string): Promise<void> {
+  if (refreshing.has(barcode)) return;
+  refreshing.add(barcode);
+  try {
+    const parsed = await fetchOff(barcode);
+    await prisma.foodProduct.update({
+      where: { barcode },
+      data: { ...(parsed ?? {}), fetchedAt: new Date() },
+    });
+  } catch (err) {
+    console.warn(`[off] refresh of ${barcode} failed:`, (err as Error).message);
+  } finally {
+    refreshing.delete(barcode);
+  }
+}
+
+/**
+ * Cache → OFF. Null when OFF has no such product (or no calories for it).
+ * Hits are cached for good and refreshed after REFRESH_AFTER_DAYS; misses are
+ * remembered for MISS_TTL_DAYS, since products are added to OFF all the time.
+ */
+export async function lookupBarcode(barcode: string): Promise<FoodProduct | null> {
+  const cached = await prisma.foodProduct.findUnique({ where: { barcode } });
+  if (cached) {
+    if (ageDays(cached.fetchedAt) > REFRESH_AFTER_DAYS) void refreshProduct(barcode);
+    return toFoodProductDTO(cached);
+  }
+
+  const miss = await prisma.barcodeMiss.findUnique({ where: { barcode } });
+  if (miss && ageDays(miss.checkedAt) < MISS_TTL_DAYS) return null;
+
+  const parsed = await fetchOff(barcode);
+  if (!parsed) {
+    await prisma.barcodeMiss.upsert({
+      where: { barcode },
+      update: { checkedAt: new Date() },
+      create: { barcode },
+    });
+    return null;
+  }
   const row = await prisma.foodProduct.upsert({
     where: { barcode },
     update: {},
     create: { barcode, ...parsed },
   });
+  if (miss) await prisma.barcodeMiss.deleteMany({ where: { barcode } });
   return toFoodProductDTO(row);
 }
 

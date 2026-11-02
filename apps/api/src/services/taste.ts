@@ -1,6 +1,7 @@
 import type { Recipe } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
 import { recipesByIds } from './recipeService.js';
+import { VISIBLE_RECIPE } from './recipeQuality.js';
 import type { RecipeShape } from '@nutrichef/shared';
 
 /**
@@ -244,6 +245,7 @@ let indexCache: { at: number; index: RecipeIndex } | null = null;
 async function recipeIndex(): Promise<RecipeIndex> {
   if (indexCache && Date.now() - indexCache.at < INDEX_TTL_MS) return indexCache.index;
   const rows = await prisma.recipe.findMany({
+    where: VISIBLE_RECIPE,
     select: {
       id: true,
       name: true,

@@ -126,7 +126,8 @@ async function sweepExpiredRows() {
     const r = await runRetentionSweep();
     app.log.info(
       `retention sweep: ${r.events} events, ${r.refreshTokens} refresh tokens, ` +
-        `${r.suggestions} suggestion counts, ${r.chatMessages} chat messages removed`,
+        `${r.suggestions} suggestion counts, ${r.chatMessages} chat messages removed; ` +
+        `${r.recipesRescored} recipe scores updated`,
     );
   } catch (err) {
     app.log.warn({ err }, 'retention sweep failed');

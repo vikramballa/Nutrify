@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma.js';
+import { recomputeRecipeQuality } from './recipeQuality.js';
 
 /**
  * The daily clean-up of rows nothing reads any more.
@@ -44,9 +45,12 @@ export interface SweepResult {
   refreshTokens: number;
   suggestions: number;
   chatMessages: number;
+  recipesRescored: number;
 }
 
 export async function runRetentionSweep(now = new Date()): Promise<SweepResult> {
+  // Score first, while this sweep's expiring events still count.
+  const recipesRescored = await recomputeRecipeQuality();
   const daysAgo = (d: number) => new Date(now.getTime() - d * 86_400_000);
   const eventCutoff = daysAgo(EVENT_RETENTION_DAYS);
   const suggestionCutoff = daysAgo(SUGGESTION_RETENTION_DAYS);
@@ -82,5 +86,5 @@ export async function runRetentionSweep(now = new Date()): Promise<SweepResult> 
     ) keep
     WHERE c."userId" = keep."userId" AND c."seq" < keep.cutoff`;
 
-  return { events, refreshTokens, suggestions, chatMessages };
+  return { events, refreshTokens, suggestions, chatMessages, recipesRescored };
 }

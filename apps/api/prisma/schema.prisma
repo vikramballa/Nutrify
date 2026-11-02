@@ -175,6 +175,16 @@ model FoodProduct {
   carbs        Float
   fat          Float
   createdAt    DateTime @default(now())
+  // When the data was last read from OFF; older than ~6 months, the next
+  // scan refreshes it in the background (recipes and labels change).
+  fetchedAt    DateTime @default(now())
+}
+
+// A barcode Open Food Facts doesn't know, remembered for a few days so
+// repeat scans of it don't each wait on OFF. Deleted when OFF has it.
+model BarcodeMiss {
+  barcode   String   @id
+  checkedAt DateTime @default(now())
 }
 
 // How often a recipe was recommended to a user: one row per (user, recipe),
@@ -300,6 +310,10 @@ model Recipe {
   // Servings the recipe itself states (curated or AI-written); when set it
   // replaces the weight-based estimate above.
   declaredServings Int?
+  // What users do with the recipe, recomputed daily (recipeQuality.ts):
+  // distinct users who saved, logged or planned it, minus twice those who
+  // said "not for me". AI recipes far below zero are hidden from lists.
+  qualityScore Int            @default(0)
   ingredients  Ingredient[]
   insights     RecipeInsight?
   searchTerms  SearchTerm[]
