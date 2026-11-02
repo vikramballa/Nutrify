@@ -23,6 +23,7 @@ export const EVENT_WEIGHTS = {
   chat: 3,
   log: 4, // they actually ate it
   favorite: 4, // they explicitly saved it
+  like: 4, // 👍 on a recipe ("this was good")
   // Without a negative signal the engine could only ever learn what someone
   // likes, so a rejected dish kept resurfacing until the weak ignored-penalty
   // caught up. An explicit "not for me" outweighs a passing view.

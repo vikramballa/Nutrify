@@ -11,14 +11,13 @@ import { prisma } from '../lib/prisma.js';
 import { getOrComputeNutrition, macrosForItems } from '../services/nutritionData.js';
 import {
   FoodLookupUnavailableError,
-  lookupBarcode,
   macrosForGrams,
 } from '../services/foodProducts.js';
 import { logEvent } from '../services/taste.js';
 import { dayRange } from '../services/tracking.js';
 import { computeStreak } from '../services/streak.js';
 import { loggedDays, recentDistinctMeals } from '../services/logQueries.js';
-import { rememberBarcode, rememberDish, rememberLabel } from '../services/personalFoods.js';
+import { productForUser, rememberBarcode, rememberDish, rememberLabel } from '../services/personalFoods.js';
 import { dayKey } from '../services/mealplan.js';
 import { intParam } from '../lib/query.js';
 
@@ -155,7 +154,7 @@ export async function logRoutes(app: FastifyInstance) {
 
     let product;
     try {
-      product = await lookupBarcode(barcode);
+      product = await productForUser(req.userId, barcode);
     } catch (err) {
       if (err instanceof FoodLookupUnavailableError) {
         return reply.code(503).send({ error: 'lookup_unavailable' });

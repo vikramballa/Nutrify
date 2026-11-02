@@ -76,6 +76,18 @@ export async function recipeRoutes(app: FastifyInstance) {
     return rec;
   });
 
+  /**
+   * 👍 "This was a good recipe". A taste signal like a favourite, and it
+   * lifts the recipe's quality score (one vote per person, see
+   * recipeQuality.ts) so a good AI recipe stays listed.
+   */
+  app.post<{ Params: { id: string } }>('/recipes/:id/like', async (req, reply) => {
+    const recipe = await prisma.recipe.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!recipe) return reply.code(404).send({ error: 'recipe_not_found' });
+    taste.logEvent(req.userId, 'like', { recipeId: recipe.id });
+    return { liked: true };
+  });
+
   /** "Not for me" — the only way the taste engine learns a negative. */
   app.post<{ Params: { id: string } }>('/recipes/:id/dislike', async (req, reply) => {
     const recipe = await prisma.recipe.findUnique({

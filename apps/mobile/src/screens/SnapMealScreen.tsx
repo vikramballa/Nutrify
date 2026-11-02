@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Image,
   ScrollView,
@@ -12,7 +13,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   labelAnalysisFromParsed,
@@ -22,13 +23,19 @@ import {
   type MealType,
   type SavedFood,
 } from '@nutrichef/shared';
-import type { RootStackParamList } from '../navigation/types';
+import type { RootStackParamList, TabParamList } from '../navigation/types';
 import { colors } from '../theme/colors';
 import { SCREEN_PADDING, fonts, radii, type } from '../theme/typography';
 import { Counter, FadeIn, PopIn, PressableScale, easing } from '../theme/motion';
 import { Screen } from '../components/Screen';
 import { Card } from '../components/Card';
-import { useLogCustomMeal, useSavedFoods, currentMealType } from '../hooks/useLogs';
+import {
+  currentMealType,
+  useForgetFood,
+  useForgetUsual,
+  useLogCustomMeal,
+  useSavedFoods,
+} from '../hooks/useLogs';
 import { useAiConsent } from '../hooks/useAiConsent';
 import { BottomSheet } from '../components/BottomSheet';
 import {
@@ -124,6 +131,7 @@ function humanError(mode: ScanMode, err: { status?: number } | null): string {
 
 export function SnapMealScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<TabParamList, 'Scan'>>();
   const aiConsent = useAiConsent();
   const [mode, setMode] = useState<ScanMode>('meal');
   const [photo, setPhoto] = useState<string | null>(null);
@@ -147,6 +155,11 @@ export function SnapMealScreen() {
   // Meal scans: whether the user swapped the estimate for their usual portion.
   const [usedUsual, setUsedUsual] = useState(false);
   const savedFoods = useSavedFoods();
+  const forgetFood = useForgetFood();
+  const forgetUsual = useForgetUsual();
+  // Label scans: the barcode this label belongs to, when the user came here
+  // because Open Food Facts didn't know it. Saved with the label.
+  const [labelBarcode, setLabelBarcode] = useState<string | null>(null);
 
   const analyzeMeal = useAnalyzeMealPhoto();
   const analyzeLabel = useAnalyzeNutritionLabel();
@@ -170,6 +183,7 @@ export function SnapMealScreen() {
     setRenameText('');
     setRenameNote(null);
     setUsedUsual(false);
+    setLabelBarcode(null);
     feedback.reset();
     analyzeMeal.reset();
     analyzeLabel.reset();
@@ -180,6 +194,34 @@ export function SnapMealScreen() {
     if (next === mode) return;
     setMode(next);
     reset();
+  }
+
+  // Sent here from the barcode screen for a product OFF doesn't know: switch
+  // to labels and tie the next label logged to that barcode.
+  const labelFor = route.params?.labelFor;
+  useEffect(() => {
+    if (!labelFor) return;
+    setMode('label');
+    reset();
+    setLabelBarcode(labelFor);
+    nav.setParams({ labelFor: undefined } as never);
+    // reset is recreated every render; only a new barcode should re-run this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labelFor]);
+
+  /** Long-press on a saved food: remove it from "Your foods". */
+  function confirmForget(food: SavedFood) {
+    Alert.alert('Remove from your foods?', `${food.name} won't be offered here any more.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => forgetFood.mutate(food.id) },
+    ]);
+  }
+
+  /** "Forget": stop offering this dish's usual portion. */
+  function forgetUsualPortion() {
+    if (!mealResult) return;
+    forgetUsual.mutate(mealResult.name);
+    setUsedUsual(true); // hides the card
   }
 
   /**
@@ -217,6 +259,7 @@ export function SnapMealScreen() {
     setLabelName(food.name);
     if (food.usualGrams) setGrams(food.usualGrams);
     setPortion(food.usualServings ?? 1);
+    setLabelBarcode(food.barcode); // logging it again keeps it on its barcode
     setLogged(false);
   }
 
@@ -394,7 +437,11 @@ export function SnapMealScreen() {
           items: [{ name, measure: per100 ? `${grams} g` : `${portion} × ${label.servingSize}` }],
           macros: scaled,
           // Saved to "Your foods", with this amount, to log again without the camera.
-          label: { analysis: label, ...(per100 ? { grams } : { servings: portion }) },
+          label: {
+            analysis: label,
+            ...(per100 ? { grams } : { servings: portion }),
+            ...(labelBarcode ? { barcode: labelBarcode } : {}),
+          },
         },
         { onSuccess: () => setLogged(true) },
       );
@@ -449,8 +496,27 @@ export function SnapMealScreen() {
             <Text style={[type.eyebrow, styles.eyebrow]}>YOUR FOODS · NO CAMERA NEEDED</Text>
             <View style={styles.chipRow}>
               {savedFoods.data!.foods.map((f) => (
-                <Chip key={f.id} label={f.name} active={false} onPress={() => applySavedFood(f)} />
+                <Chip
+                  key={f.id}
+                  label={f.name}
+                  active={false}
+                  onPress={() => applySavedFood(f)}
+                  onLongPress={() => confirmForget(f)}
+                />
               ))}
+            </View>
+            <Text style={[type.caption, styles.captionTop]}>Long-press a food to remove it.</Text>
+          </FadeIn>
+        )}
+
+        {mode === 'label' && labelBarcode && !logged && (
+          <FadeIn delay={50}>
+            <View style={styles.barcodeBanner}>
+              <Ionicons name="barcode-outline" size={18} color={colors.primary} />
+              <Text style={[type.caption, styles.flex1]}>
+                Scanning the label for barcode {labelBarcode}. NutriChef will remember it, so your next scan
+                of this barcode just works.
+              </Text>
             </View>
           </FadeIn>
         )}
@@ -652,14 +718,24 @@ export function SnapMealScreen() {
                       {usualSummary(mealResult.usual.items)} · {mealResult.usual.calories} cal
                     </Text>
                   </View>
-                  <PressableScale
-                    onPress={applyUsualPortion}
-                    style={styles.usualButton}
-                    accessibilityRole="button"
-                    accessibilityLabel="Use my usual portion"
-                  >
-                    <Text style={styles.renameLink}>Use it</Text>
-                  </PressableScale>
+                  <View style={styles.usualActions}>
+                    <PressableScale
+                      onPress={applyUsualPortion}
+                      style={styles.usualButton}
+                      accessibilityRole="button"
+                      accessibilityLabel="Use my usual portion"
+                    >
+                      <Text style={styles.renameLink}>Use it</Text>
+                    </PressableScale>
+                    <PressableScale
+                      onPress={forgetUsualPortion}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Forget my usual portion of this dish"
+                    >
+                      <Text style={styles.forgetLink}>Forget</Text>
+                    </PressableScale>
+                  </View>
                 </Card>
               </FadeIn>
             )}
@@ -996,14 +1072,17 @@ function Chip({
   label,
   active,
   onPress,
+  onLongPress,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
+  onLongPress?: () => void;
 }) {
   return (
     <PressableScale
       onPress={onPress}
+      onLongPress={onLongPress}
       scaleTo={0.94}
       style={[styles.chip, active && styles.chipActive]}
       accessibilityRole="button"
@@ -1255,6 +1334,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 16,
     color: colors.textPrimary,
+  },
+  usualActions: { alignItems: 'center', gap: 6 },
+  forgetLink: { fontFamily: fonts.medium, fontSize: 12, color: colors.textTertiary },
+  barcodeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: radii.md,
+    backgroundColor: colors.primarySoft,
   },
   usualCard: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   usualButton: {

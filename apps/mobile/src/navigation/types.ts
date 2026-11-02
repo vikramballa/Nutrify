@@ -21,8 +21,11 @@ export type RootStackParamList = {
 export type TabParamList = {
   Home: undefined;
   Recipes: undefined;
-  /** Centre tab — the raised camera button. */
-  Scan: undefined;
+  /**
+   * Centre tab — the raised camera button. `labelFor`: open in label mode to
+   * scan the label of a barcode Open Food Facts doesn't know.
+   */
+  Scan: { labelFor?: string } | undefined;
   Grocery: undefined;
   Ask: undefined;
 };

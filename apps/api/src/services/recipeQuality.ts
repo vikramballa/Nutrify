@@ -4,7 +4,7 @@ import { prisma } from '../lib/prisma.js';
 /**
  * Recipe quality from behaviour, not from asking. Per recipe:
  *
- *   qualityScore = users who saved, logged or planned it
+ *   qualityScore = users who saved, logged, planned or 👍 it
  *                − 2 × users who said "not for me" (last 90 days of events)
  *
  * Each person counts once per side, so one user can't push a recipe up or
@@ -34,6 +34,7 @@ export async function recomputeRecipeQuality(): Promise<number> {
         SELECT "recipeId", "userId" FROM "Favorite"
         UNION ALL SELECT "recipeId", "userId" FROM "MealLog" WHERE "recipeId" IS NOT NULL
         UNION ALL SELECT "recipeId", "userId" FROM "MealPlanEntry" WHERE "recipeId" IS NOT NULL
+        UNION ALL SELECT "recipeId", "userId" FROM "UserEvent" WHERE "type" = 'like' AND "recipeId" IS NOT NULL
       ) kept GROUP BY "recipeId"
     ),
     negative AS (

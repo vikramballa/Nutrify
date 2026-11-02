@@ -20,7 +20,7 @@ import { ErrorState } from '../components/States';
 import { useInsights, useNutrition } from '../hooks/useInsights';
 import { useLogMeal, currentMealType } from '../hooks/useLogs';
 import { useFavorites, useToggleFavorite } from '../hooks/useFavorites';
-import { useFullRecipe } from '../hooks/useRecipes';
+import { useFullRecipe, useLikeRecipe } from '../hooks/useRecipes';
 import type { RootStackParamList } from '../navigation/types';
 
 function ActionButton({
@@ -91,6 +91,7 @@ export function RecipeDetailScreen() {
   const [portion, setPortion] = useState(1);
   const [mealType, setMealType] = useState<MealType>(currentMealType());
   const favorites = useFavorites();
+  const like = useLikeRecipe();
   const toggleFav = useToggleFavorite();
   const isFav = favorites.data?.recipes.some((r) => r.id === recipe.id) ?? false;
 
@@ -183,6 +184,29 @@ export function RecipeDetailScreen() {
               {recipe.category} • {recipe.cuisine}
               {total != null ? ` • ${total} min` : ''}
             </Text>
+            {recipe.source === 'AI' && (
+              // AI recipes are kept or hidden by how people rate them
+              // (recipeQuality.ts); a 👍 is the quickest way to vote.
+              <View style={styles.aiRow}>
+                <Ionicons name="sparkles-outline" size={14} color={colors.textTertiary} />
+                <Text style={[type.caption, styles.flex1]}>
+                  {like.isSuccess ? 'Thanks! That helps keep good recipes around.' : 'Written by AI. Was it good?'}
+                </Text>
+                {!like.isSuccess && (
+                  <PressableScale
+                    onPress={() => like.mutate(recipe.id)}
+                    disabled={like.isPending}
+                    haptic
+                    style={styles.likeButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Yes, this was a good recipe"
+                  >
+                    <Ionicons name="thumbs-up-outline" size={15} color={colors.primary} />
+                    <Text style={styles.likeLabel}>Good</Text>
+                  </PressableScale>
+                )}
+              </View>
+            )}
           </FadeIn>
 
           {/* Primary actions — the point of opening a recipe. */}
@@ -378,6 +402,18 @@ function SheetChip({ label, active, onPress }: { label: string; active: boolean;
 }
 
 const styles = StyleSheet.create({
+  flex1: { flex: 1 },
+  aiRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+  likeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: colors.primarySoft,
+  },
+  likeLabel: { fontFamily: fonts.semibold, fontSize: 13, color: colors.primary },
   recipeSkeleton: { padding: 20, gap: 12 },
   sheetSection: { gap: 10 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

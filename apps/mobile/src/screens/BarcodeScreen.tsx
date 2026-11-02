@@ -3,7 +3,10 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { FoodProduct, MealType } from '@nutrichef/shared';
+import type { RootStackParamList } from '../navigation/types';
 import { colors } from '../theme/colors';
 import { SCREEN_PADDING, fonts, radii, type } from '../theme/typography';
 import { Counter, FadeIn, PressableScale } from '../theme/motion';
@@ -51,6 +54,7 @@ function lookupError(err: ApiError | null): string {
 
 export function BarcodeScreen() {
   const [permission, requestPermission] = useCameraPermissions();
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [barcode, setBarcode] = useState<string | null>(null);
   const [manual, setManual] = useState('');
   const [grams, setGrams] = useState<number | null>(null);
@@ -189,6 +193,22 @@ export function BarcodeScreen() {
               <Text style={[type.body, styles.center]}>
                 {lookupError(product.error as ApiError)}
               </Text>
+              {(product.error as ApiError | null)?.status === 404 && (
+                <>
+                  {/* Unknown to Open Food Facts: the printed label has the
+                      numbers, and is remembered against this barcode. */}
+                  <PressableScale
+                    onPress={() => nav.navigate('Tabs', { screen: 'Scan', params: { labelFor: barcode } })}
+                    style={[styles.smallButton, styles.labelButton]}
+                    accessibilityRole="button"
+                  >
+                    <Text style={[styles.smallButtonLabel, styles.labelButtonText]}>Scan its nutrition label</Text>
+                  </PressableScale>
+                  <Text style={[type.caption, styles.center]}>
+                    NutriChef will remember it, so next time this barcode just works.
+                  </Text>
+                </>
+              )}
               <PressableScale onPress={reset} style={styles.smallButton}>
                 <Text style={styles.smallButtonLabel}>Scan another</Text>
               </PressableScale>
@@ -342,6 +362,8 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 }
 
 const styles = StyleSheet.create({
+  labelButton: { backgroundColor: colors.primary },
+  labelButtonText: { color: '#fff' },
   content: { padding: SCREEN_PADDING, paddingBottom: 40, gap: 16 },
   flex1: { flex: 1 },
   center: { textAlign: 'center' },

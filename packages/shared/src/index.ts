@@ -106,6 +106,9 @@ export const CreateCustomLogSchema = z.object({
         analysis: NutritionLabelAnalysisSchema,
         grams: z.number().positive().max(10_000).optional(),
         servings: z.number().positive().max(20).optional(),
+        // The pack's barcode, when the label was scanned because the barcode
+        // was unknown: later scans of that barcode find this label.
+        barcode: BarcodeSchema.optional(),
       }),
     )
     .optional(),
@@ -930,6 +933,7 @@ export const SavedFoodSchema = z.object({
   id: z.string(),
   name: z.string(),
   label: NutritionLabelAnalysisSchema,
+  barcode: z.string().nullable(),
   usualGrams: z.number().positive().nullable(),
   usualServings: z.number().positive().nullable(),
   timesLogged: z.number().int().positive(),

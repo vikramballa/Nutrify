@@ -113,6 +113,16 @@ export function useRecommendedRecipes(count: number) {
   });
 }
 
+/** 👍 "This was a good recipe": a taste signal, and it keeps AI recipes listed. */
+export function useLikeRecipe() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (recipeId: string) =>
+      apiFetch<{ liked: boolean }>(`/recipes/${recipeId}/like`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['recommended'] }),
+  });
+}
+
 /** "Not for me" — the only negative signal the taste engine ever receives. */
 export function useDislikeRecipe() {
   const qc = useQueryClient();

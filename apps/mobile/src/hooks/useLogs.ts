@@ -74,6 +74,14 @@ export function useSavedFoods() {
   });
 }
 
+/** Stop offering the usual portion of a scanned dish. */
+export function useForgetUsual() {
+  return useMutation({
+    mutationFn: (dishName: string) =>
+      apiFetch(`/foods/dishes?name=${encodeURIComponent(dishName)}`, { method: 'DELETE' }),
+  });
+}
+
 export function useForgetFood() {
   const qc = useQueryClient();
   return useMutation({
