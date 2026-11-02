@@ -32,6 +32,7 @@ import {
 import { adherenceScore, computeDailyTotals, dayRange } from '../services/tracking.js';
 import { logEvent } from '../services/taste.js';
 import { priceMealPhoto } from '../services/mealPhoto.js';
+import { usualDish } from '../services/personalFoods.js';
 import {
   applyCorrection,
   cleanDishName,
@@ -145,7 +146,8 @@ export async function assistantRoutes(app: FastifyInstance) {
         }
         const named = applyCorrection(data, corrections);
         logEvent(req.userId, 'search', { term: named.name });
-        return { ...(await priceMealPhoto(named)), modelName: named.modelName, learned: named.learned, provider };
+        const [priced, usual] = await Promise.all([priceMealPhoto(named), usualDish(req.userId, named.name)]);
+        return { ...priced, modelName: named.modelName, learned: named.learned, usual, provider };
       } catch (err) {
         return sendAiError(reply, err);
       }
@@ -207,10 +209,13 @@ export async function assistantRoutes(app: FastifyInstance) {
           maxTokens: 900,
         });
         // The user has the last word on the name, whatever the model echoed.
-        const priced = await priceMealPhoto({ ...data, name: correctName, confidence: 1 });
+        const [priced, usual] = await Promise.all([
+          priceMealPhoto({ ...data, name: correctName, confidence: 1 }),
+          usualDish(req.userId, correctName),
+        ]);
         return {
           saved: true,
-          analysis: { ...priced, modelName: predictedName, learned: false, provider },
+          analysis: { ...priced, modelName: predictedName, learned: false, usual, provider },
         };
       } catch (err) {
         // The lesson is saved either way; the app keeps the old numbers

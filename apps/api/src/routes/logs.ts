@@ -18,6 +18,7 @@ import { logEvent } from '../services/taste.js';
 import { dayRange } from '../services/tracking.js';
 import { computeStreak } from '../services/streak.js';
 import { loggedDays, recentDistinctMeals } from '../services/logQueries.js';
+import { rememberBarcode, rememberDish, rememberLabel } from '../services/personalFoods.js';
 import { dayKey } from '../services/mealplan.js';
 import { intParam } from '../lib/query.js';
 
@@ -118,6 +119,15 @@ export async function logRoutes(app: FastifyInstance) {
     const log = await prisma.mealLog.create({
       data: { userId: req.userId, recipeId: null, name, mealType, ...macros },
     });
+    // Remember scans and labels for next time. The log is already saved, so
+    // a failure here only loses the shortcut, never the meal.
+    const { scan, label } = parsed.data;
+    try {
+      if (scan) await rememberDish(req.userId, name, scan.items, macros);
+      if (label) await rememberLabel(req.userId, name, label.analysis, label);
+    } catch (err) {
+      req.log.warn({ err }, 'could not remember food');
+    }
     return toDTO(log);
   });
 
@@ -163,6 +173,11 @@ export async function logRoutes(app: FastifyInstance) {
         ...macrosForGrams(product, grams),
       },
     });
+    try {
+      await rememberBarcode(req.userId, barcode, product.name, grams);
+    } catch (err) {
+      req.log.warn({ err }, 'could not remember barcode portion');
+    }
     return toDTO(log);
   });
 

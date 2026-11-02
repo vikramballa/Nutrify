@@ -5,6 +5,7 @@ import {
   MealPhotoAnalysisSchema,
   NutritionLabelAnalysisSchema,
   PantryResponseSchema,
+  UsualDishSchema,
   type CoachInsight,
   type MealScanFeedback,
   type MealType,
@@ -18,6 +19,8 @@ const AnalysisResponseSchema = MealPhotoAnalysisSchema.extend({
   // shown came from one of the user's past corrections.
   modelName: z.string().optional(),
   learned: z.boolean().optional(),
+  // The portion of this dish the user logged before, if any.
+  usual: UsualDishSchema.nullable().optional(),
 });
 export type MealPhotoAnalysisResult = z.infer<typeof AnalysisResponseSchema>;
 

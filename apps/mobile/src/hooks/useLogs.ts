@@ -3,6 +3,7 @@ import {
   FoodProductSchema,
   LogPreviewResponseSchema,
   MealLogSchema,
+  SavedFoodsResponseSchema,
   TodayLogsResponseSchema,
   type CreateCustomLog,
   type CustomLogItem,
@@ -55,7 +56,29 @@ export function useLogCustomMeal() {
         await apiFetch('/logs/custom', { method: 'POST', body: JSON.stringify(input) }),
         'logs:custom',
       ),
-    onSuccess: () => invalidateAll(qc),
+    onSuccess: (_log, input) => {
+      invalidateAll(qc);
+      if (input.label) qc.invalidateQueries({ queryKey: SAVED_FOODS_KEY });
+    },
+  });
+}
+
+const SAVED_FOODS_KEY = ['foods', 'mine'];
+
+/** Labels this user logged before, newest first: log one again without the camera. */
+export function useSavedFoods() {
+  return useQuery({
+    queryKey: SAVED_FOODS_KEY,
+    queryFn: async () => parseWith(SavedFoodsResponseSchema, await apiFetch('/foods/mine'), 'foods:mine'),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useForgetFood() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/foods/mine/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: SAVED_FOODS_KEY }),
   });
 }
 
@@ -100,7 +123,11 @@ export function useLogBarcode() {
         await apiFetch('/logs/barcode', { method: 'POST', body: JSON.stringify(input) }),
         'logs:barcode',
       ),
-    onSuccess: () => invalidateAll(qc),
+    onSuccess: (_log, input) => {
+      invalidateAll(qc);
+      // The product now carries this amount as the user's usual.
+      qc.invalidateQueries({ queryKey: ['foods', 'barcode', input.barcode] });
+    },
   });
 }
 

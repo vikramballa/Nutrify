@@ -40,6 +40,8 @@ model User {
   chatMessages ChatMessage[]
   mealScanCorrections MealScanCorrection[]
   recipeSuggestions RecipeSuggestion[]
+  dishes       UserDish[]
+  foods        UserFood[]
   createdAt    DateTime        @default(now())
 }
 
@@ -185,6 +187,53 @@ model FoodProduct {
 model BarcodeMiss {
   barcode   String   @id
   checkedAt DateTime @default(now())
+}
+
+// A dish this user has scanned and logged, with the portion they logged
+// last time ("3 idli + 1 katori sambar"). The next scan the scanner names
+// the same way offers it as "your usual". Keyed like MealScanCorrection
+// (correctionKey: case, word order and filler words don't matter).
+model UserDish {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dishKey     String
+  name        String
+  // MealPhotoItem[] as last logged (already scaled to the portion eaten).
+  items       Json
+  calories    Int
+  protein     Int
+  carbs       Int
+  fat         Int
+  timesEaten  Int      @default(1)
+  lastEatenAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, dishKey])
+  @@index([userId, lastEatenAt])
+}
+
+// A packaged food this user logged: a scanned label (kept whole, so it can
+// be logged again without the camera) or a barcode product (only how much
+// they usually have; the product data lives in FoodProduct).
+// foodKey: "label:<name key>" or "barcode:<code>".
+model UserFood {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodKey       String
+  name          String
+  barcode       String?
+  // NutritionLabelAnalysis as read off the pack (label foods only).
+  label         Json?
+  usualGrams    Float?
+  usualServings Float?
+  timesLogged   Int      @default(1)
+  lastLoggedAt  DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, foodKey])
+  @@index([userId, lastLoggedAt])
 }
 
 // How often a recipe was recommended to a user: one row per (user, recipe),

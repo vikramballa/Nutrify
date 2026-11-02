@@ -14,14 +14,21 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { labelAnalysisFromParsed, ocrRows, parseLabelText, type MealType } from '@nutrichef/shared';
+import {
+  labelAnalysisFromParsed,
+  ocrRows,
+  parseLabelText,
+  type MealPhotoItem,
+  type MealType,
+  type SavedFood,
+} from '@nutrichef/shared';
 import type { RootStackParamList } from '../navigation/types';
 import { colors } from '../theme/colors';
 import { SCREEN_PADDING, fonts, radii, type } from '../theme/typography';
 import { Counter, FadeIn, PopIn, PressableScale, easing } from '../theme/motion';
 import { Screen } from '../components/Screen';
 import { Card } from '../components/Card';
-import { useLogCustomMeal, currentMealType } from '../hooks/useLogs';
+import { useLogCustomMeal, useSavedFoods, currentMealType } from '../hooks/useLogs';
 import { useAiConsent } from '../hooks/useAiConsent';
 import { BottomSheet } from '../components/BottomSheet';
 import {
@@ -137,6 +144,9 @@ export function SnapMealScreen() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameText, setRenameText] = useState('');
   const [renameNote, setRenameNote] = useState<string | null>(null);
+  // Meal scans: whether the user swapped the estimate for their usual portion.
+  const [usedUsual, setUsedUsual] = useState(false);
+  const savedFoods = useSavedFoods();
 
   const analyzeMeal = useAnalyzeMealPhoto();
   const analyzeLabel = useAnalyzeNutritionLabel();
@@ -159,6 +169,7 @@ export function SnapMealScreen() {
     setRenameOpen(false);
     setRenameText('');
     setRenameNote(null);
+    setUsedUsual(false);
     feedback.reset();
     analyzeMeal.reset();
     analyzeLabel.reset();
@@ -198,6 +209,35 @@ export function SnapMealScreen() {
       }
     }
     return analyzeLabel.mutateAsync({ image: await toDataUrl(uri), ocrText });
+  }
+
+  /** A label logged before: shown like a fresh scan, at the amount used last time. */
+  function applySavedFood(food: SavedFood) {
+    showLabel({ ...food.label, provider: 'saved' });
+    setLabelName(food.name);
+    if (food.usualGrams) setGrams(food.usualGrams);
+    setPortion(food.usualServings ?? 1);
+    setLogged(false);
+  }
+
+  /** Swap the photo estimate for the portion the user logged last time. */
+  function applyUsualPortion() {
+    const usual = mealResult?.usual;
+    if (!mealResult || !usual) return;
+    setMealResult({
+      ...mealResult,
+      items: usual.items,
+      calories: usual.calories,
+      protein: usual.protein,
+      carbs: usual.carbs,
+      fat: usual.fat,
+      note:
+        usual.timesEaten > 1
+          ? `Your usual portion, as you logged it ${usual.timesEaten} times.`
+          : 'The portion you logged last time.',
+    });
+    setPortion(1);
+    setUsedUsual(true);
   }
 
   function showLabel(label: NutritionLabelAnalysisResult) {
@@ -242,6 +282,7 @@ export function SnapMealScreen() {
     setLogged(false);
     setVerdict('pending');
     setRenameNote(null);
+    setUsedUsual(false);
     try {
       if (mode === 'meal') {
         setMealResult(await analyzeMeal.mutateAsync(await toDataUrl(uri)));
@@ -337,6 +378,9 @@ export function SnapMealScreen() {
               }))
             : [{ name: meal.name, measure: '1 serving' }],
           macros: scaled,
+          // The items as eaten: next time this dish is scanned, the app can
+          // offer this portion as "your usual".
+          scan: meal.items.length ? { items: meal.items.map((i) => scaleItem(i, portion)) } : undefined,
         },
         { onSuccess: () => setLogged(true) },
       );
@@ -349,6 +393,8 @@ export function SnapMealScreen() {
           mealType,
           items: [{ name, measure: per100 ? `${grams} g` : `${portion} × ${label.servingSize}` }],
           macros: scaled,
+          // Saved to "Your foods", with this amount, to log again without the camera.
+          label: { analysis: label, ...(per100 ? { grams } : { servings: portion }) },
         },
         { onSuccess: () => setLogged(true) },
       );
@@ -398,6 +444,17 @@ export function SnapMealScreen() {
           </FadeIn>
         )}
 
+        {mode === 'label' && !photo && !result && (savedFoods.data?.foods.length ?? 0) > 0 && (
+          <FadeIn delay={60}>
+            <Text style={[type.eyebrow, styles.eyebrow]}>YOUR FOODS · NO CAMERA NEEDED</Text>
+            <View style={styles.chipRow}>
+              {savedFoods.data!.foods.map((f) => (
+                <Chip key={f.id} label={f.name} active={false} onPress={() => applySavedFood(f)} />
+              ))}
+            </View>
+          </FadeIn>
+        )}
+
         {photo ? (
           <PopIn>
             <View style={styles.photoWrap}>
@@ -416,10 +473,16 @@ export function SnapMealScreen() {
               )}
             </View>
           </PopIn>
-        ) : (
+        ) : !result ? (
           <FadeIn delay={80} style={styles.flex1}>
             <EmptyDropZone mode={mode} />
           </FadeIn>
+        ) : (
+          // A saved food opened without a photo: offer the camera instead.
+          <PressableScale onPress={reset} style={styles.scanInstead} accessibilityRole="button">
+            <Ionicons name="camera-outline" size={16} color={colors.primary} />
+            <Text style={styles.renameLink}>Scan a label instead</Text>
+          </PressableScale>
         )}
 
         {!result && !busy && (
@@ -485,12 +548,22 @@ export function SnapMealScreen() {
                   ) : (
                     <View style={[styles.pill, styles.pillHigh]}>
                       <Ionicons
-                        name={labelResult?.source === 'device' ? 'phone-portrait-outline' : 'checkmark-done'}
+                        name={
+                          labelResult?.provider === 'saved'
+                            ? 'bookmark-outline'
+                            : labelResult?.source === 'device'
+                              ? 'phone-portrait-outline'
+                              : 'checkmark-done'
+                        }
                         size={12}
                         color={colors.success}
                       />
                       <Text style={[styles.pillText, { color: colors.success }]}>
-                        {labelResult?.source === 'device' ? 'Read on phone' : 'From label'}
+                        {labelResult?.provider === 'saved'
+                          ? 'Saved food'
+                          : labelResult?.source === 'device'
+                            ? 'Read on phone'
+                            : 'From label'}
                       </Text>
                     </View>
                   )}
@@ -568,6 +641,28 @@ export function SnapMealScreen() {
 
             {!awaitingVerdict && (
             <>
+            {mode === 'meal' && mealResult?.usual && !usedUsual && !logged && (
+              <FadeIn delay={100}>
+                <Card style={styles.usualCard}>
+                  <View style={styles.flex1}>
+                    <Text style={type.eyebrow}>
+                      {mealResult.usual.timesEaten > 1 ? 'YOUR USUAL' : 'LAST TIME'}
+                    </Text>
+                    <Text style={[type.body, styles.captionTop]} numberOfLines={2}>
+                      {usualSummary(mealResult.usual.items)} · {mealResult.usual.calories} cal
+                    </Text>
+                  </View>
+                  <PressableScale
+                    onPress={applyUsualPortion}
+                    style={styles.usualButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Use my usual portion"
+                  >
+                    <Text style={styles.renameLink}>Use it</Text>
+                  </PressableScale>
+                </Card>
+              </FadeIn>
+            )}
             <FadeIn delay={110}>
               <Text style={[type.eyebrow, styles.eyebrow]}>HOW MUCH DID YOU EAT</Text>
               <View style={styles.chipRow}>
@@ -745,6 +840,23 @@ export function SnapMealScreen() {
       </BottomSheet>
     </Screen>
   );
+}
+
+/** A photo item scaled to the portion eaten, for remembering as "your usual". */
+function scaleItem(i: MealPhotoItem, portion: number): MealPhotoItem {
+  const r = (n: number | undefined) => (n == null ? undefined : Math.round(n * portion));
+  return {
+    name: i.name,
+    grams: Math.round(i.grams * portion),
+    ...(i.count ? { count: Math.min(50, Math.max(1, Math.round(i.count * portion))) } : {}),
+    ...(i.calories != null ? { calories: r(i.calories), protein: r(i.protein), carbs: r(i.carbs), fat: r(i.fat) } : {}),
+    ...(i.matched != null ? { matched: i.matched } : {}),
+  };
+}
+
+/** "3 idli, sambar, chutney" */
+function usualSummary(items: MealPhotoItem[]): string {
+  return items.map((i) => (i.count ? `${i.count} ${i.name}` : i.name)).join(', ');
 }
 
 /** Idle state: a dashed frame with a slowly breathing scan glyph. */
@@ -1144,6 +1256,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textPrimary,
   },
+  usualCard: { padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  usualButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: radii.pill,
+    backgroundColor: colors.primarySoft,
+  },
+  scanInstead: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
   learnedRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   learnedText: { fontFamily: fonts.medium, fontSize: 12, color: colors.primary },
   saveLabel: { fontFamily: fonts.semibold, fontSize: 16, color: '#fff' },

@@ -65,7 +65,8 @@ export function BarcodeScreen() {
 
   const p = product.data;
   // Default amount: one declared serving, else 100 g.
-  const amount = grams ?? p?.servingGrams ?? 100;
+  // Start from what this user had last time, else the pack's serving.
+  const amount = grams ?? p?.usualGrams ?? p?.servingGrams ?? 100;
   const macros = p ? macrosFor(p, amount) : null;
 
   function onScanned(result: BarcodeScanningResult) {
@@ -232,6 +233,16 @@ export function BarcodeScreen() {
             <FadeIn delay={80}>
               <Text style={[type.eyebrow, styles.eyebrow]}>HOW MUCH · {Math.round(amount)} g</Text>
               <View style={styles.chipRow}>
+                {p.usualGrams ? (
+                  <Chip
+                    label={`Your usual (${Math.round(p.usualGrams)} g)`}
+                    active={amount === p.usualGrams && !customGrams}
+                    onPress={() => {
+                      setCustomGrams('');
+                      setGrams(p.usualGrams!);
+                    }}
+                  />
+                ) : null}
                 {p.servingGrams
                   ? SERVING_PRESETS.map((s) => {
                       const g = Math.round(p.servingGrams! * s * 10) / 10;

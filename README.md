@@ -196,6 +196,16 @@ export DATABASE_URL=postgresql://nutrichef:nutrichef@localhost:5432/nutrichef_te
 npm exec -w apps/api -- prisma migrate deploy && npm test -w apps/api
 ```
 
+**Data rules live in Postgres too.** Enum-like columns and number ranges have
+CHECK constraints (see `20261102120000_data_rules`). New ones are added
+`NOT VALID` and validated only when existing rows pass, so a deploy never
+fails on old data; list any still pending with
+`SELECT conrelid::regclass, conname FROM pg_constraint WHERE NOT convalidated;`.
+
+**Daily sweep** (`services/retention.ts`): deletes old events, expired tokens
+and stale suggestion counts in batches, keeps 500 chat messages per user, and
+rescores recipes (`services/recipeQuality.ts`).
+
 **New indexes on live tables** go in their own migration file, one statement
 each, as `CREATE INDEX CONCURRENTLY` (Postgres refuses it inside a
 transaction), so the app keeps reading and writing while the index builds.

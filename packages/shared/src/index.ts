@@ -96,6 +96,19 @@ export const CreateCustomLogSchema = z.object({
   mealType: MealTypeSchema,
   items: z.array(CustomLogItemSchema).min(1).max(30),
   macros: MacrosSchema.optional(),
+  // Where a custom meal came from, so the API can remember it for next time:
+  // a meal-photo scan (items as eaten → the user's usual portion of that
+  // dish) or a nutrition label (the label itself → "My foods").
+  scan: z.lazy(() => z.object({ items: z.array(MealPhotoItemSchema).min(1).max(30) })).optional(),
+  label: z
+    .lazy(() =>
+      z.object({
+        analysis: NutritionLabelAnalysisSchema,
+        grams: z.number().positive().max(10_000).optional(),
+        servings: z.number().positive().max(20).optional(),
+      }),
+    )
+    .optional(),
 });
 export type CreateCustomLog = z.infer<typeof CreateCustomLogSchema>;
 
@@ -836,6 +849,8 @@ export const BarcodeSchema = z.string().regex(/^\d{8,14}$/);
 
 export const FoodProductSchema = z.object({
   barcode: BarcodeSchema,
+  // How many grams this user logged last time, when they have had it before.
+  usualGrams: z.number().positive().nullable().optional(),
   name: z.string(),
   brand: z.string().nullable(),
   // Grams in the manufacturer's serving, when the product declares one.
@@ -892,3 +907,33 @@ export type AdaptiveGoalsResponse = z.infer<typeof AdaptiveGoalsResponseSchema>;
 export * from './labelText';
 import type { ParsedLabel } from './labelText';
 export * from './shopping';
+
+// ---------------------------------------------------------------------------
+// Personal memory: usual dish portions and saved foods
+// ---------------------------------------------------------------------------
+
+/** The portion of a scanned dish the user logged before. */
+export const UsualDishSchema = z.object({
+  name: z.string(),
+  items: z.array(MealPhotoItemSchema),
+  calories: z.number().int().nonnegative(),
+  protein: z.number().int().nonnegative(),
+  carbs: z.number().int().nonnegative(),
+  fat: z.number().int().nonnegative(),
+  timesEaten: z.number().int().positive(),
+  lastEatenAt: z.string(),
+});
+export type UsualDish = z.infer<typeof UsualDishSchema>;
+
+/** A nutrition label the user logged before, ready to log again. */
+export const SavedFoodSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  label: NutritionLabelAnalysisSchema,
+  usualGrams: z.number().positive().nullable(),
+  usualServings: z.number().positive().nullable(),
+  timesLogged: z.number().int().positive(),
+});
+export type SavedFood = z.infer<typeof SavedFoodSchema>;
+
+export const SavedFoodsResponseSchema = z.object({ foods: z.array(SavedFoodSchema) });
