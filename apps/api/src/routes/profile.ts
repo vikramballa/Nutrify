@@ -97,9 +97,15 @@ export async function profileRoutes(app: FastifyInstance) {
       include: { goals: true },
     });
     if (!user) return reply.code(404).send({ error: 'not_found' });
+    // Upsert, not create: two first-launch requests at once both found no
+    // goals row, and the second create failed on the unique userId.
     const goals =
       user.goals ??
-      (await prisma.nutritionGoals.create({ data: { userId: req.userId } }));
+      (await prisma.nutritionGoals.upsert({
+        where: { userId: req.userId },
+        update: {},
+        create: { userId: req.userId },
+      }));
     return toResponse(user, goals);
   });
 

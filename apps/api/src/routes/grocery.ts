@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import type { FastifyInstance } from 'fastify';
 import { GroceryFromRecipeRequestSchema } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
@@ -37,10 +38,21 @@ export async function groceryRoutes(app: FastifyInstance) {
     if (!name) return reply.code(400).send({ error: 'name_required' });
     if (name.length > 200) return reply.code(400).send({ error: 'name_too_long' });
     logEvent(req.userId, 'grocery', { term: name }); // strongest taste signal
-    const item = await prisma.groceryItem.create({
-      data: { name, userId: req.userId },
-    });
-    return groceryDTO(item);
+    try {
+      const item = await prisma.groceryItem.create({
+        data: { name, userId: req.userId },
+      });
+      return groceryDTO(item);
+    } catch (err) {
+      // Already on the list (GroceryItem_open_name_key): a double tap or two
+      // devices at once. Hand back the item that is there, not an error.
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')) throw err;
+      const existing = await prisma.groceryItem.findFirst({
+        where: { userId: req.userId, checked: false, name: { equals: name, mode: 'insensitive' } },
+      });
+      if (!existing) throw err;
+      return groceryDTO(existing);
+    }
   });
 
   // Adds a recipe's ingredients in one call — all of them, or just the ones the
@@ -76,6 +88,9 @@ export async function groceryRoutes(app: FastifyInstance) {
     if (missing.length > 0) {
       for (const name of missing) logEvent(req.userId, 'grocery', { term: name });
       await prisma.groceryItem.createMany({
+        // A racing request may have added some already; the unique index
+        // drops those instead of failing the whole batch.
+        skipDuplicates: true,
         data: missing.map((name) => ({
           userId: req.userId,
           name,

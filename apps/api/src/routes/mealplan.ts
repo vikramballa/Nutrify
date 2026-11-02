@@ -204,6 +204,7 @@ export async function mealPlanRoutes(app: FastifyInstance) {
     const missing = missingIngredientNames(existing.map((i) => i.name), needed);
     if (missing.length > 0) {
       await prisma.groceryItem.createMany({
+        skipDuplicates: true, // see GroceryItem_open_name_key
         data: missing.map((name) => ({ userId: req.userId, name })),
       });
     }
