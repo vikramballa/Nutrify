@@ -3,3 +3,6 @@ dist
 .expo
 *.log
 .git
+apps/api/recipe-photos
+apps/mobile
+.env

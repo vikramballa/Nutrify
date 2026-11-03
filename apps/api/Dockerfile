@@ -1,17 +1,20 @@
 # Build context must be the REPO ROOT (workspaces: shared + hoisted deps):
 #   docker build -f apps/api/Dockerfile -t nutrichef-api .
 
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
+# Prisma's engines need OpenSSL, which Alpine doesn't ship.
+RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package.json package-lock.json ./
-COPY packages/shared/package.json packages/shared/
-COPY apps/api/package.json apps/api/
-RUN npm ci -w @nutrichef/shared -w @nutrichef/api --include-workspace-root=false
+# Sources before `npm ci`: its postinstall scripts build packages/shared (root)
+# and run `prisma generate` (api), so both need their files already in place.
 COPY packages/shared packages/shared
 COPY apps/api apps/api
+RUN npm ci -w @nutrichef/shared -w @nutrichef/api --include-workspace-root=false
 RUN npm run build -w @nutrichef/api   # prisma generate + shared build + tsc → dist/
 
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
+RUN apk add --no-cache openssl
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/node_modules node_modules
