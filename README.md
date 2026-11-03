@@ -17,7 +17,7 @@ first-class.
 ![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?logo=prisma&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-171%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-244%20passing-brightgreen)
 
 </div>
 
@@ -48,14 +48,16 @@ first-class.
 | | |
 | --- | --- |
 | 📸 **Scan a meal** | Photograph your plate. A vision model names each item with its grams (and pieces: "3 idli"), then NutriChef's own food tables price every item they know, so the calories don't depend on the model's arithmetic. Then it asks **"Is this right?"**: tap **No**, type the real dish, and the photo is re-estimated as that dish. The correction is remembered, so the next scan the model would misname the same way comes back with your name. |
-| 🏷️ **Nutrition labels** | Read **on the phone** with Apple's built-in text recognition: free, offline, no AI permission. Handles US panels and Indian/FSSAI "per 100 g" tables, kJ and decimal commas; pick how many grams you ate. Falls back to the vision model only when the text doesn't add up. **Barcodes** via Open Food Facts. |
+| 🏷️ **Nutrition labels** | Read **on the phone** with Apple's built-in text recognition: free, offline, no AI permission. Handles US panels and Indian/FSSAI "per 100 g" tables, kJ and decimal commas; pick how many grams you ate. Falls back to the vision model only when the text doesn't add up. **Barcodes** via Open Food Facts; for a pack it doesn't know, **scan its nutrition label** once and that barcode finds it from then on. |
+| 🗂️ **Your food memory** | NutriChef remembers how you eat. Scan a dish you've logged before and it offers **your usual** ("3 idli, sambar · 420 cal", one tap to use). Logged labels become **Your foods**, ready to log again without the camera, and each barcode pre-selects the amount you usually have. Long-press a saved food to remove it, or tap **Forget** on a usual portion. |
 | 🍛 **Indian food** | ~200 prepared dishes (tiffins, curries, rice, breads, snacks, sweets, drinks) and household units: "3 idli", "1 katori dal", "1 plate biryani", "dosa x2". 80 curated Indian recipes with declared servings; the **Indian** chip covers every regional cuisine. |
 | 🥘 **Cook from pantry** | List what's in your kitchen and get dishes ranked by how little is missing. Missing items go straight to the grocery list. |
 | 🛒 **Shop a recipe** | Tap **Shop** on a recipe, mark what you already have (salt and spices start ticked), and only the missing ingredients go on the list with their quantities. Each item opens **Blinkit, Zepto or Instamart** search in their app (universal links), remembering your last store. None of them has a public cart API, so it's one search per item. |
 | 📅 **Meal planning** | A weekly plan with one-tap auto-fill from your taste profile, then the whole week's ingredients sent to the grocery list. |
 | 📊 **Tracking** | Typed meal logging ("2 eggs, toast, handful of almonds"), portion-aware recipe logging (½ to 3 servings), water, weight, streaks and progress charts. |
 | 🎯 **Adaptive goals** | After a few weeks of logs and weigh-ins, NutriChef measures your actual daily energy use (TDEE) and recalibrates your calorie target. |
-| 🧠 **Taste engine** | Personalised suggestions with **no LLM**: implicit feedback (views, logs, favourites, dislikes…) is folded into a time-decayed profile, and every suggestion comes with the reasons it was picked. |
+| 🧠 **Taste engine** | Personalised suggestions with **no LLM**: implicit feedback (views, logs, favourites, 👍, dislikes…) is folded into a time-decayed profile, and every suggestion comes with the reasons it was picked. Suggestions you keep skipping fade out. |
+| ⭐ **Recipe quality** | Every recipe is scored by how many people saved, logged, planned or 👍'd it, minus those who said "not for me". AI-generated recipes that people reject drop out of search, lists and suggestions; a search for one then generates a fresh recipe instead. |
 | 💬 **Ask NutriChef** | A chat assistant that only talks about food and nutrition, plus a weekly coach that reviews your real logs. |
 | 🔔 **Smart reminders** | Local notifications scheduled from your own typical meal times. No push server needed. |
 | 📴 **Offline-friendly** | The query cache is saved on the device, so the app opens with your plan and recipes even when the server can't be reached. |
@@ -94,7 +96,8 @@ packages/shared   zod schemas + pure nutrition maths, the single API ↔ app con
   default runs on **Ollama's free cloud tier**, so you don't need an API key or a
   credit card.
 - **Recipes**: [TheMealDB](https://www.themealdb.com) plus a curated Indian
-  collection. When a search finds nothing, AI generates the recipe.
+  collection. Search forgives typos ("paner butter masala" finds Paneer Butter
+  Masala); only when nothing close exists does AI generate the recipe.
 - **Security**: helmet, rate limits (tighter on AI routes), body size limits,
   every input bounded, and a single error envelope.
 - **App Store ready**: in-app account deletion, privacy policy and terms served
@@ -105,15 +108,15 @@ packages/shared   zod schemas + pure nutrition maths, the single API ↔ app con
 
 ### Prerequisites
 
-- Node.js 20+ and npm 10+
+- Node.js 22+ and npm 10+
 - PostgreSQL 14+ (installed locally, or `docker compose up -d` using the included compose file)
 - Optional: [Ollama](https://ollama.com) (`ollama signin` once) for the AI features
 
 ### 1. Install and configure
 
 ```bash
-git clone https://github.com/<vikramballa>/nutrichef.git
-cd nutrichef
+git clone https://github.com/vikramballa/Nutrify.git
+cd Nutrify
 npm install                                  # also builds packages/shared + prisma generate
 cp .env.example .env                         # set DATABASE_URL, AUTH_SECRET, FDC_API_KEY…
 cp apps/mobile/.env.example apps/mobile/.env # set EXPO_PUBLIC_API_URL
@@ -154,6 +157,14 @@ Set `EXPO_PUBLIC_API_URL` in `apps/mobile/.env` to match where the app runs:
 | iOS simulator | `http://localhost:4000/api/v1` |
 | Android emulator | `http://10.0.2.2:4000/api/v1` |
 | Physical device (same Wi-Fi) | `http://<your-computer-LAN-IP>:4000/api/v1` |
+
+> **Physical device not connecting?** In Safari on the phone, open
+> `http://<your-computer-LAN-IP>:4000/health`. If it doesn't load: office and guest
+> Wi-Fi often keep devices apart (two networks with similar names can even be
+> separate subnets), so join the computer to the **phone's Personal Hotspot** and
+> use that IP instead. On macOS, the firewall must allow incoming connections for
+> the exact `node` binary running the API (switching versions with nvm changes it).
+> A release build bakes the URL in, so a new IP means a rebuild.
 
 > The meal scanner needs a vision-capable provider. Without one, `/vision/*`
 > returns 503 and the Scan tab says so plainly. The rest of the app keeps working.
@@ -196,6 +207,15 @@ export DATABASE_URL=postgresql://nutrichef:nutrichef@localhost:5432/nutrichef_te
 npm exec -w apps/api -- prisma migrate deploy && npm test -w apps/api
 ```
 
+The test files run one at a time (`apps/api/vitest.config.ts`): the retention
+sweep and recipe rescoring act on the whole database. Each file cleans up the
+rows it creates.
+
+**Times are UTC in the database.** Timestamp columns hold UTC without a time
+zone, and a migration pins every database session to UTC, so raw SQL counts
+days the same way as the app whatever the server's own time zone is. CI's
+Postgres deliberately runs in `Asia/Kolkata` to prove it.
+
 **Data rules live in Postgres too.** Enum-like columns and number ranges have
 CHECK constraints (see `20261102120000_data_rules`). New ones are added
 `NOT VALID` and validated only when existing rows pass, so a deploy never
@@ -232,12 +252,12 @@ from the same geometry by `apps/mobile/scripts/generate_icons.py` (needs Pillow)
 ├── apps/
 │   ├── api/
 │   │   ├── prisma/            schema, migrations, seed + import scripts
-│   │   ├── recipe-photos/     bundled recipe images, served by the API
+│   │   ├── recipe-photos/     local copies of the Pexels recipe photos (the app loads them from Pexels' CDN)
 │   │   ├── src/
 │   │   │   ├── routes/        HTTP only: validate → service → DTO
 │   │   │   ├── services/      logic: taste engine, nutrition, AI chain, adaptive goals…
 │   │   │   └── lib/           prisma, auth, http helpers
-│   │   └── test/              vitest unit tests (pure, no DB)
+│   │   └── test/              vitest unit tests (pure, no DB); test/db/ runs against Postgres
 │   └── mobile/
 │       ├── src/
 │       │   ├── screens/       one file per screen
@@ -249,14 +269,14 @@ from the same geometry by `apps/mobile/scripts/generate_icons.py` (needs Pillow)
 │       └── plugins/           Expo config plugins
 ├── packages/shared/           zod schemas + nutrition maths (API ↔ app contract)
 ├── docs/screenshots/          README images
-└── .github/workflows/ci.yml   install, typecheck, test on every push / PR
+└── .github/workflows/ci.yml   every push / PR: migrations + drift check on Postgres 16, typecheck, all tests
 ```
 
 ## Production (API)
 
 ```bash
 npm run build -w apps/api && npm start -w apps/api     # node dist/server.js
-docker build -t nutrichef-api apps/api                 # or as a container
+docker build -f apps/api/Dockerfile -t nutrichef-api . # or as a container (build from the repo root)
 ```
 
 In production `AUTH_SECRET` must be a real secret (32+ characters, not the
