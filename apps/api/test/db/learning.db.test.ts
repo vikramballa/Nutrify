@@ -69,6 +69,17 @@ describe.skipIf(!RUN)('learning (Postgres)', () => {
       const mapped = await prisma.searchTerm.findUnique({ where: { term } });
       expect(mapped?.recipeId).toBe(res.recipes[0].id);
     });
+
+    it('generates only for a submitted search, never while typing', async () => {
+      const { aiComplete } = await import('../../src/services/ai/index.js');
+      const ai = vi.mocked(aiComplete);
+      ai.mockClear();
+      const term = `zqxv ${tag}`; // matches nothing anywhere
+      expect(await search(term, { take: 20 }, 'card')).toEqual({ recipes: [], source: 'none' });
+      expect(ai).not.toHaveBeenCalled();
+      await search(term, { take: 20 }, 'card', { generate: true });
+      expect(ai).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('recipe quality', () => {

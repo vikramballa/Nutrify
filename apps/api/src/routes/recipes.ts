@@ -25,14 +25,16 @@ function parsePage(q: { take?: string; cursor?: string }): { take: number; curso
 }
 
 export async function recipeRoutes(app: FastifyInstance) {
-  app.get<{ Querystring: ListQuery & { q?: string } }>(
+  app.get<{ Querystring: ListQuery & { q?: string; generate?: string } }>(
     '/recipes/search',
     { config: AI_RATE_LIMIT },
     async (req, reply) => {
       const q = req.query.q ?? '';
       if (q.length > MAX_QUERY_LEN) return reply.code(400).send({ error: 'query_too_long' });
       if (q.trim()) taste.logEvent(req.userId, 'search', { term: q });
-      return recipes.search(q, parsePage(req.query), recipes.shapeParam(req.query.fields));
+      return recipes.search(q, parsePage(req.query), recipes.shapeParam(req.query.fields), {
+        generate: req.query.generate === '1',
+      });
     },
   );
 

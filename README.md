@@ -97,7 +97,8 @@ packages/shared   zod schemas + pure nutrition maths, the single API ↔ app con
   credit card.
 - **Recipes**: [TheMealDB](https://www.themealdb.com) plus a curated Indian
   collection. Search forgives typos ("paner butter masala" finds Paneer Butter
-  Masala); only when nothing close exists does AI generate the recipe.
+  Masala); only when nothing close exists, and you press **Search**, does AI
+  generate the recipe (results while typing never create one).
 - **Security**: helmet, rate limits (tighter on AI routes), body size limits,
   every input bounded, and a single error envelope.
 - **App Store ready**: in-app account deletion, privacy policy and terms served

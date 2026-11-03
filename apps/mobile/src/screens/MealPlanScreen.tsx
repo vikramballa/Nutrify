@@ -361,8 +361,11 @@ function EntryPicker({
 }) {
   const [tab, setTab] = useState<PickerTab>('search');
   const [query, setQuery] = useState('');
+  // Searches run per keystroke here; only the Search key may create an AI
+  // recipe (see useRecipeSearch).
+  const [submitted, setSubmitted] = useState('');
   const [customName, setCustomName] = useState('');
-  const search = useRecipeSearch(query);
+  const search = useRecipeSearch(query, query.trim().length > 0 && submitted === query);
   const favorites = useFavorites();
 
   const recipes: Recipe[] =
@@ -483,6 +486,8 @@ function EntryPicker({
                   <TextInput
                     value={query}
                     onChangeText={setQuery}
+                    onSubmitEditing={() => setSubmitted(query)}
+                    returnKeyType="search"
                     placeholder="Search recipes..."
                     placeholderTextColor={colors.textTertiary}
                     autoFocus
@@ -506,7 +511,11 @@ function EntryPicker({
                   <ActivityIndicator color={colors.primary} style={{ paddingVertical: 24 }} />
                 ) : recipes.length === 0 ? (
                   <Text style={[type.caption, { textAlign: 'center', paddingVertical: 24 }]}>
-                    {tab === 'favorites' ? 'No favorites yet' : 'No matches'}
+                    {tab === 'favorites'
+                      ? 'No favorites yet'
+                      : submitted === query
+                        ? 'No matches'
+                        : 'No matches. Press Search to create the recipe.'}
                   </Text>
                 ) : (
                   recipes.map((r) => (

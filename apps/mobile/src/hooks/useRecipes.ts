@@ -38,13 +38,21 @@ export function useFullRecipe(recipe: Recipe) {
   };
 }
 
-export function useRecipeSearch(query: string) {
+/**
+ * `generate`: the user submitted this search (keyboard Search key), so a miss
+ * may create an AI recipe. Searches made while typing never do — they used to
+ * fill the shared library with recipes for half words.
+ */
+export function useRecipeSearch(query: string, generate = false) {
   return useQuery({
-    queryKey: ['search', query],
+    queryKey: ['search', query, generate],
     queryFn: async ({ signal }) =>
       parseWith(
         SearchResponseSchema,
-        await apiFetch(`/recipes/search?q=${encodeURIComponent(query)}&${CARD}`, { signal }),
+        await apiFetch(
+          `/recipes/search?q=${encodeURIComponent(query)}&${CARD}${generate ? '&generate=1' : ''}`,
+          { signal },
+        ),
         'recipes/search',
       ),
     enabled: query.trim().length > 0,

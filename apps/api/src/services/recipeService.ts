@@ -177,6 +177,7 @@ export async function search(
   q: string,
   page: PageOpts = { take: 20 },
   shape: RecipeShape = 'full',
+  { generate = false }: { generate?: boolean } = {},
 ): Promise<{ recipes: Recipe[]; source: SearchSource }> {
   const term = q.trim().toLowerCase();
   if (!term) return { recipes: [], source: 'none' };
@@ -235,7 +236,11 @@ export async function search(
     }
   }
 
-  // 4. AI generation.
+  // 4. AI generation — only for a search the user submitted. The app searches
+  //    as you type, so without this every pause wrote a recipe for a half
+  //    word into the shared library ("Chc", "Chicken Sam", four "Chicken
+  //    Sambar"s); a cancelled request still runs to the end on the server.
+  if (!generate) return { recipes: [], source: 'none' };
   try {
     const { content, provider } = await aiComplete({
       system: RECIPE_SYSTEM,

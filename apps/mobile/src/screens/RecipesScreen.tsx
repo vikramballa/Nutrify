@@ -36,6 +36,9 @@ export function RecipesScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
+  // The term last submitted with the Search key. Derived rather than reset by
+  // the debounce, so a debounce firing after Enter can't cancel the submit.
+  const [submitted, setSubmitted] = useState('');
   const [showGenerating, setShowGenerating] = useState(false);
   const [cuisine, setCuisine] = useState('');
 
@@ -45,7 +48,8 @@ export function RecipesScreen() {
     return () => clearTimeout(t);
   }, [text]);
 
-  const search = useRecipeSearch(query);
+  const generate = query.length > 0 && submitted === query;
+  const search = useRecipeSearch(query, generate);
   const dayRecipe = useRandomRecipes(1);
   const cuisines = useCuisines();
   const browse = useBrowseRecipes(30);
@@ -80,10 +84,20 @@ export function RecipesScreen() {
 
   function emptyBody() {
     if (loading) {
-      return mode === 'search' && showGenerating ? <GeneratingIndicator /> : <GridSkeleton />;
+      return mode === 'search' && generate && showGenerating ? <GeneratingIndicator /> : <GridSkeleton />;
     }
     if (active.isError) return <ErrorState onRetry={() => active.refetch()} />;
-    if (mode === 'search') return <EmptyState message={`Nothing found for “${query}”`} />;
+    if (mode === 'search') {
+      return (
+        <EmptyState
+          message={
+            generate
+              ? `Nothing found for “${query}”`
+              : `Nothing found for “${query}”. Press Search to create the recipe.`
+          }
+        />
+      );
+    }
     if (mode === 'cuisine') return <EmptyState message={`No ${cuisine} recipes yet`} />;
     return <EmptyState message="No recipes in your library yet" />;
   }
@@ -91,7 +105,12 @@ export function RecipesScreen() {
   return (
     <Screen>
       <View style={styles.searchContainer}>
-        <SearchBar value={text} onChangeText={setText} onSubmit={() => setQuery(text.trim())} />
+        <SearchBar value={text} onChangeText={setText} onSubmit={() => {
+            const term = text.trim();
+            setQuery(term);
+            setSubmitted(term);
+          }}
+        />
       </View>
       {cuisines.data && cuisines.data.cuisines.length > 0 && (
         <CuisineChips cuisines={cuisines.data.cuisines} selected={cuisine} onSelect={setCuisine} />
