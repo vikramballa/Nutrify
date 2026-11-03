@@ -17,6 +17,9 @@ jobs:
           POSTGRES_USER: nutrichef
           POSTGRES_PASSWORD: nutrichef
           POSTGRES_DB: nutrichef
+          # Not UTC on purpose: raw SQL that depends on the session time zone
+          # passes on a UTC server and breaks on a developer's local one.
+          TZ: Asia/Kolkata
         ports:
           - 5432:5432
         options: >-

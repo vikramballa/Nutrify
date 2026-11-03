@@ -169,9 +169,10 @@ export function logEvent(
 }
 
 /**
- * Signals only. `suggest` rows carry weight 0 and are written on every
- * recommendation, so including them here let them crowd real searches and
- * views out of the MAX_EVENTS window until the profile came back empty.
+ * Signals only. `suggest` rows (weight 0) used to be written on every
+ * recommendation and crowded real searches and views out of the MAX_EVENTS
+ * window until the profile came back empty. Suggestions now live in
+ * RecipeSuggestion counters; old suggest rows remain until they age out.
  */
 async function signalEvents(userId: string): Promise<TasteEvent[]> {
   const since = new Date(Date.now() - EVENT_WINDOW_DAYS * 86_400_000);
