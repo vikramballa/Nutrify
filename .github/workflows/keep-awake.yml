@@ -1,0 +1,24 @@
+name: Keep API awake
+
+# Render's free web service sleeps after 15 minutes without a request, and
+# the first request after that waits ~1 minute for it to boot — longer than
+# the app's 20 s timeout. A ping every 10 minutes keeps it up; one service
+# running all month fits the free 750 instance-hours. Free for a public repo.
+#
+# The URL is the repository variable API_HEALTH_URL (Settings → Secrets and
+# variables → Actions → Variables); delete the variable to stop pinging.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    if: vars.API_HEALTH_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Ping /health
+        # --retry covers a cold start if a scheduled run was skipped.
+        run: curl -fsS --retry 4 --retry-delay 15 --retry-all-errors --max-time 90 "${{ vars.API_HEALTH_URL }}"
