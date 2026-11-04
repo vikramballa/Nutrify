@@ -18,6 +18,16 @@ function baseRoot(): string {
   return process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 }
 
+/**
+ * Through the local app (`ollama signin`) no key is needed. A hosted API has no
+ * local app, so it calls https://ollama.com directly with OLLAMA_API_KEY.
+ */
+function ollamaHeaders(key: string): Record<string, string> {
+  return key
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }
+    : { 'Content-Type': 'application/json' };
+}
+
 export class OllamaProvider extends OpenAICompatibleProvider {
   constructor() {
     super({
@@ -38,7 +48,7 @@ export class OllamaProvider extends OpenAICompatibleProvider {
   }
 
   protected headers(): Record<string, string> {
-    return { 'Content-Type': 'application/json' };
+    return ollamaHeaders(this.apiKey());
   }
 
   // Configured when a base URL or model env is present (no API key needed).
@@ -72,7 +82,7 @@ export class OllamaVisionProvider extends OpenAICompatibleProvider {
   }
 
   protected headers(): Record<string, string> {
-    return { 'Content-Type': 'application/json' };
+    return ollamaHeaders(this.apiKey());
   }
 
   isConfigured(): boolean {
