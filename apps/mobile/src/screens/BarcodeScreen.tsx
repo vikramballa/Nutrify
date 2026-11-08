@@ -13,9 +13,9 @@ import { Counter, FadeIn, PressableScale } from '../theme/motion';
 import { Screen } from '../components/Screen';
 import { Card } from '../components/Card';
 import { currentMealType, useBarcodeProduct, useLogBarcode } from '../hooks/useLogs';
+import { MEAL_LABELS, MEAL_TYPES } from '../lib/meals';
 import type { ApiError } from '../api/client';
 
-const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 // Retail symbologies only — QR codes on packaging are marketing links.
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'] as const;
 const GRAM_PRESETS = [30, 50, 100, 150, 200];
@@ -307,7 +307,7 @@ export function BarcodeScreen() {
                 {MEAL_TYPES.map((m) => (
                   <Chip
                     key={m}
-                    label={m[0].toUpperCase() + m.slice(1)}
+                    label={MEAL_LABELS[m]}
                     active={m === mealType}
                     onPress={() => setMealType(m)}
                   />

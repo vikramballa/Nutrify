@@ -143,16 +143,31 @@ export function HomeScreen() {
           )}
           {/* Typed logging is the most frequent action in the app; it was
               only reachable from inside Progress. */}
-          <PressableScale
-            onPress={() => nav.navigate('LogMeal')}
-            haptic
-            style={styles.logButton}
-            accessibilityRole="button"
-            accessibilityLabel="Log what you ate"
-          >
-            <Ionicons name="add-circle" size={20} color="#fff" />
-            <Text style={styles.logButtonText}>Log what you ate</Text>
-          </PressableScale>
+          <View style={styles.logRow}>
+            <PressableScale
+              onPress={() => nav.navigate('LogMeal')}
+              haptic
+              style={[styles.logButton, styles.flex1]}
+              accessibilityRole="button"
+              accessibilityLabel="Log what you ate"
+            >
+              <Ionicons name="add-circle" size={20} color="#fff" />
+              <Text style={styles.logButtonText}>Log what you ate</Text>
+            </PressableScale>
+            {/* Where a wrong log gets fixed — it was only an ✕ deep in Progress. */}
+            <PressableScale
+              onPress={() => nav.navigate('Meals')}
+              haptic
+              style={styles.mealsButton}
+              accessibilityRole="button"
+              accessibilityLabel={`Today's meals, ${logs.data?.logs.length ?? 0} logged`}
+            >
+              <Ionicons name="list" size={18} color={colors.primary} />
+              <Text style={styles.mealsButtonText}>
+                Today{logs.data?.logs.length ? ` · ${logs.data.logs.length}` : ''}
+              </Text>
+            </PressableScale>
+          </View>
         </FadeIn>
 
         <FadeIn delay={160}>
@@ -289,16 +304,26 @@ const styles = StyleSheet.create({
   },
   quickActionLabel: { fontSize: 13.5 },
   quickActionHint: { fontSize: 11, marginTop: 1 },
+  logRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   logButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 12,
     paddingVertical: 14,
     borderRadius: radii.pill,
     backgroundColor: colors.primary,
   },
+  mealsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    borderRadius: radii.pill,
+    backgroundColor: colors.primaryLight,
+  },
+  mealsButtonText: { fontFamily: fonts.semibold, fontSize: 15, color: colors.primaryDark },
   logButtonText: { fontFamily: fonts.semibold, fontSize: 15, color: '#fff' },
   suggestionsHeader: { marginBottom: 12 },
   separator: { width: 14 },

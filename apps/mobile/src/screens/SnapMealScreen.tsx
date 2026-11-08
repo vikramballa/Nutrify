@@ -36,6 +36,7 @@ import {
   useLogCustomMeal,
   useSavedFoods,
 } from '../hooks/useLogs';
+import { MEAL_LABELS, MEAL_TYPES } from '../lib/meals';
 import { useAiConsent } from '../hooks/useAiConsent';
 import { BottomSheet } from '../components/BottomSheet';
 import {
@@ -51,7 +52,6 @@ import { recognizeText } from '../ocr/labelOcr';
 const MAX_EDGE = 1024;
 const JPEG_QUALITY = 0.7;
 
-const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 /**
  * The user's answer to "Is this right?" on a meal scan. Logging options stay
@@ -800,7 +800,7 @@ export function SnapMealScreen() {
                 {MEAL_TYPES.map((m) => (
                   <Chip
                     key={m}
-                    label={m[0].toUpperCase() + m.slice(1)}
+                    label={MEAL_LABELS[m]}
                     active={m === mealType}
                     onPress={() => setMealType(m)}
                   />

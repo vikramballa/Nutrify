@@ -6,6 +6,7 @@ import {
   type BottomTabNavigationOptions,
 } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { useAuth } from '../auth/AuthContext';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -22,6 +23,7 @@ import { RecipeDetailScreen } from '../screens/RecipeDetailScreen';
 import { MealPlanScreen } from '../screens/MealPlanScreen';
 import { ProgressScreen } from '../screens/ProgressScreen';
 import { LogMealScreen } from '../screens/LogMealScreen';
+import { MealsScreen } from '../screens/MealsScreen';
 import { ProfileSetupScreen } from '../screens/ProfileSetupScreen';
 import { SavedScreen } from '../screens/SavedScreen';
 import { ShopRecipeScreen } from '../screens/ShopRecipeScreen';
@@ -118,6 +120,10 @@ const scanTabOptions: BottomTabNavigationOptions = {
 };
 
 function Tabs() {
+  // A tabBarStyle height/paddingBottom *replaces* the navigator's own
+  // safe-area handling, so the bar must add the home-indicator inset back
+  // itself — without it the labels sat on the indicator on Face ID iPhones.
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -126,10 +132,10 @@ function Tabs() {
         tabBarInactiveTintColor: colors.tabInactive,
         tabBarStyle: {
           backgroundColor: colors.surface,
-          height: 66,
+          height: 66 + insets.bottom,
           borderTopColor: colors.border,
           paddingTop: 6,
-          paddingBottom: 8,
+          paddingBottom: 8 + insets.bottom,
         },
         tabBarLabelStyle: { fontFamily: fonts.semibold, fontSize: 11, letterSpacing: 0.1 },
         tabBarIcon: ({ color, size, focused }) => (
@@ -206,6 +212,11 @@ export function RootNavigator() {
         name="LogMeal"
         component={LogMealScreen}
         options={{ headerShown: true, title: 'Log a Meal' }}
+      />
+      <Stack.Screen
+        name="Meals"
+        component={MealsScreen}
+        options={{ headerShown: true, title: 'Your Meals' }}
       />
       <Stack.Screen
         name="Pantry"

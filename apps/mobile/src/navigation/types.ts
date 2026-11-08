@@ -1,5 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type { Recipe } from '@nutrichef/shared';
+import type { MealType, Recipe } from '@nutrichef/shared';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -10,7 +10,10 @@ export type RootStackParamList = {
   ShopRecipe: { recipe: Recipe };
   MealPlan: undefined;
   Progress: undefined;
-  LogMeal: undefined;
+  /** `mealType` pre-selects the slot — Beverages opens straight on the drink picker. */
+  LogMeal: { mealType?: MealType } | undefined;
+  /** One day's meals to review, edit or delete. `date` is a UTC day key; default today. */
+  Meals: { date?: string } | undefined;
   Onboarding: undefined;
   Settings: undefined;
   Saved: undefined;

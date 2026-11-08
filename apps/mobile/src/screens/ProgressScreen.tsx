@@ -17,6 +17,8 @@ import { SmartTargetsCard } from '../components/SmartTargetsCard';
 import { useProfile } from '../hooks/useProfile';
 import { useTodayLogs, useDeleteLog } from '../hooks/useLogs';
 import { useProgressSummary, useUpsertWeight, useWeightHistory } from '../hooks/useTracking';
+import { MEAL_ICONS, mealLabel } from '../lib/meals';
+import type { MealType } from '@nutrichef/shared';
 
 const MACROS = [
   { key: 'calories', label: 'Calories', unit: '' },
@@ -25,12 +27,6 @@ const MACROS = [
   { key: 'fat', label: 'Fat', unit: 'g' },
 ] as const;
 
-const MEAL_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  breakfast: 'sunny-outline',
-  lunch: 'restaurant-outline',
-  dinner: 'moon-outline',
-  snack: 'cafe-outline',
-};
 
 export function ProgressScreen() {
   const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -203,17 +199,30 @@ export function ProgressScreen() {
         <View style={{ gap: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={type.sectionHeader}>Today's Meals</Text>
-            <PressableScale
-              onPress={() => nav.navigate('LogMeal')}
-              scaleTo={0.94}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-              hitSlop={8}
-            >
-              <Ionicons name="add-circle" size={20} color={colors.primary} />
-              <Text style={{ fontFamily: fonts.semibold, fontSize: 14, color: colors.primary }}>
-                Log a meal
-              </Text>
-            </PressableScale>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <PressableScale
+                onPress={() => nav.navigate('Meals')}
+                scaleTo={0.94}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                hitSlop={8}
+              >
+                <Ionicons name="create-outline" size={18} color={colors.primary} />
+                <Text style={{ fontFamily: fonts.semibold, fontSize: 14, color: colors.primary }}>
+                  Edit
+                </Text>
+              </PressableScale>
+              <PressableScale
+                onPress={() => nav.navigate('LogMeal')}
+                scaleTo={0.94}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                hitSlop={8}
+              >
+                <Ionicons name="add-circle" size={20} color={colors.primary} />
+                <Text style={{ fontFamily: fonts.semibold, fontSize: 14, color: colors.primary }}>
+                  Log
+                </Text>
+              </PressableScale>
+            </View>
           </View>
           {logs.length === 0 ? (
             <Card style={{ padding: 24, alignItems: 'center', gap: 8 }}>
@@ -239,13 +248,13 @@ export function ProgressScreen() {
                     }}
                   >
                     <Ionicons
-                      name={MEAL_ICONS[log.mealType] ?? 'restaurant-outline'}
+                      name={MEAL_ICONS[log.mealType as MealType] ?? 'restaurant-outline'}
                       size={20}
                       color={colors.primary}
                     />
                     <View style={{ flex: 1 }}>
                       <Text style={type.caption}>
-                        {log.mealType[0].toUpperCase() + log.mealType.slice(1)}
+                        {mealLabel(log.mealType)}
                       </Text>
                       <Text style={[type.body, { fontFamily: fonts.semibold }]} numberOfLines={1}>
                         {log.name}

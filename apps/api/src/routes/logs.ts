@@ -6,6 +6,7 @@ import {
   LogPreviewRequestSchema,
   MealTypeSchema,
   RepeatLogSchema,
+  UpdateLogSchema,
 } from '@nutrichef/shared';
 import { prisma } from '../lib/prisma.js';
 import { getOrComputeNutrition, macrosForItems } from '../services/nutritionData.js';
@@ -14,7 +15,7 @@ import {
   macrosForGrams,
 } from '../services/foodProducts.js';
 import { logEvent } from '../services/taste.js';
-import { dayRange } from '../services/tracking.js';
+import { dayRange, resolveDay } from '../services/tracking.js';
 import { computeStreak } from '../services/streak.js';
 import { loggedDays, recentDistinctMeals } from '../services/logQueries.js';
 import { productForUser, rememberBarcode, rememberDish, rememberLabel } from '../services/personalFoods.js';
@@ -48,6 +49,20 @@ const STREAK_LOOKBACK_DAYS = 400;
 const RECENT_MEAL_DAYS = 30;
 const RECENT_MEAL_COUNT = 8;
 const REMINDER_SAMPLE_DAYS = 60;
+/** A day's page shows every meal; nobody logs more, and it bounds the read. */
+const DAY_LOG_CAP = 100;
+
+function sumMacros(logs: { calories: number; protein: number; carbs: number; fat: number }[]) {
+  return logs.reduce(
+    (t, l) => ({
+      calories: t.calories + l.calories,
+      protein: t.protein + l.protein,
+      carbs: t.carbs + l.carbs,
+      fat: t.fat + l.fat,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  );
+}
 
 /** Spreading the row would ship userId (and every future column) to the
  *  client; the DTO is an explicit whitelist instead. */
@@ -192,17 +207,66 @@ export async function logRoutes(app: FastifyInstance) {
       take,
       ...(req.query.cursor ? { cursor: { id: req.query.cursor }, skip: 1 } : {}),
     });
-    const totals = logs.reduce(
-      (t, l) => ({
-        calories: t.calories + l.calories,
-        protein: t.protein + l.protein,
-        carbs: t.carbs + l.carbs,
-        fat: t.fat + l.fat,
-      }),
-      { calories: 0, protein: 0, carbs: 0, fat: 0 },
-    );
-    return { logs: logs.map(toDTO), totals };
+    return { logs: logs.map(toDTO), totals: sumMacros(logs) };
   });
+
+  // Every meal on one UTC day (default today) — the "Your meals" page, where
+  // past days can be reviewed and fixed. UTC like /logs/today, so the two agree.
+  app.get<{ Querystring: { date?: string } }>('/logs/day', async (req, reply) => {
+    const day = resolveDay(req.query.date);
+    if (!day) return reply.code(400).send({ error: 'invalid_date' });
+    const endExclusive = new Date(day);
+    endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+    const logs = await prisma.mealLog.findMany({
+      where: { userId: req.userId, at: { gte: day, lt: endExclusive } },
+      orderBy: [{ at: 'asc' }, { id: 'asc' }],
+      take: DAY_LOG_CAP,
+    });
+    return { date: dayKey(day), logs: logs.map(toDTO), totals: sumMacros(logs) };
+  });
+
+  /**
+   * Fix a logged meal — wrong slot ("tea" filed as lunch), wrong amount, or
+   * the wrong food. Macros never come from the body: `servings` scales the
+   * stored row and `items` re-prices through the same tables as /logs/custom.
+   * The time it was eaten is kept, so the day and streak don't move.
+   */
+  app.patch<{ Params: { id: string } }>(
+    '/logs/:id',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    async (req, reply) => {
+      const parsed = UpdateLogSchema.safeParse(req.body);
+      if (!parsed.success) return reply.code(400).send({ error: 'invalid_log' });
+      const { mealType, servings, items, name } = parsed.data;
+
+      const current = await prisma.mealLog.findFirst({
+        where: { id: req.params.id, userId: req.userId },
+      });
+      if (!current) return reply.code(404).send({ error: 'not_found' });
+
+      const data: {
+        mealType?: string;
+        name?: string;
+        recipeId?: null;
+        calories?: number;
+        protein?: number;
+        carbs?: number;
+        fat?: number;
+      } = {};
+      if (mealType) data.mealType = mealType;
+      if (name) data.name = name;
+      if (servings !== undefined) Object.assign(data, scaleMacros(current, servings));
+      if (items) {
+        // A different food is no longer that recipe.
+        Object.assign(data, (await macrosForItems(items)).totals, { recipeId: null });
+        if (!name) data.name = items.map((i) => i.name.trim()).join(', ').slice(0, 200);
+      }
+
+      // Ownership was checked above; a delete racing this lands as P2025 → 404.
+      const updated = await prisma.mealLog.update({ where: { id: current.id }, data });
+      return toDTO(updated);
+    },
+  );
 
   /**
    * Re-log something already eaten. Macros come from the stored row rather

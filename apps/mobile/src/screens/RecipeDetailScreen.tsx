@@ -19,6 +19,7 @@ import { BottomSheet } from '../components/BottomSheet';
 import { ErrorState } from '../components/States';
 import { useInsights, useNutrition } from '../hooks/useInsights';
 import { useLogMeal, currentMealType } from '../hooks/useLogs';
+import { MEAL_LABELS, MEAL_TYPES } from '../lib/meals';
 import { useFavorites, useToggleFavorite } from '../hooks/useFavorites';
 import { useFullRecipe, useLikeRecipe } from '../hooks/useRecipes';
 import type { RootStackParamList } from '../navigation/types';
@@ -70,7 +71,6 @@ const HERO_HEIGHT = 300;
 
 /** Portions offered when logging — the API accepts 0.25 to 10 servings. */
 const PORTIONS = [0.5, 1, 1.5, 2, 3] as const;
-const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 const portionLabel = (p: number) =>
   p === 0.5 ? '½ serving' : p === 1.5 ? '1½ servings' : `${p} serving${p === 1 ? '' : 's'}`;
@@ -345,7 +345,7 @@ export function RecipeDetailScreen() {
             {MEAL_TYPES.map((m) => (
               <SheetChip
                 key={m}
-                label={m[0].toUpperCase() + m.slice(1)}
+                label={MEAL_LABELS[m]}
                 active={m === mealType}
                 onPress={() => setMealType(m)}
               />

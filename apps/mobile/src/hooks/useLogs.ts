@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  DayLogsResponseSchema,
   FoodProductSchema,
   LogPreviewResponseSchema,
   MealLogSchema,
@@ -9,6 +10,7 @@ import {
   type CustomLogItem,
   type LogBarcode,
   type MealType,
+  type UpdateLog,
 } from '@nutrichef/shared';
 import { apiFetch, parseWith } from '../api/client';
 
@@ -16,6 +18,7 @@ const KEY = ['logs', 'today'];
 // Logging anything moves the streak and the recent-meals row too.
 const AFFECTED = [
   KEY,
+  ['logs', 'day'],
   ['logs', 'recent'],
   ['streak'],
   ['progress', 'summary'],
@@ -31,6 +34,38 @@ export function useTodayLogs() {
     queryKey: KEY,
     queryFn: async () =>
       parseWith(TodayLogsResponseSchema, await apiFetch('/logs/today'), 'logs/today'),
+  });
+}
+
+/** UTC day key, the same day boundary the API uses for every log read. */
+export function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Every meal logged on one UTC day — the "Your meals" page. */
+export function useDayLogs(date: string) {
+  return useQuery({
+    queryKey: ['logs', 'day', date],
+    queryFn: async () =>
+      parseWith(
+        DayLogsResponseSchema,
+        await apiFetch(`/logs/day?date=${encodeURIComponent(date)}`),
+        'logs/day',
+      ),
+  });
+}
+
+/** Move a log to another meal, rescale it, or replace what it was. */
+export function useUpdateLog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: UpdateLog & { id: string }) =>
+      parseWith(
+        MealLogSchema,
+        await apiFetch(`/logs/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+        'logs:update',
+      ),
+    onSuccess: () => invalidateAll(qc),
   });
 }
 

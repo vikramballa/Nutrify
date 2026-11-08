@@ -53,7 +53,11 @@ export function RecentMealsRow() {
   function logAgain(meal: RecentMeal) {
     setLogged((prev) => new Set(prev).add(meal.logId));
     repeat.mutate(
-      { logId: meal.logId, mealType: currentMealType() },
+      // A drink stays a drink: re-logging tea at 1 pm filed it as lunch.
+      {
+        logId: meal.logId,
+        mealType: meal.mealType === 'beverage' ? 'beverage' : currentMealType(),
+      },
       {
         onError: () =>
           setLogged((prev) => {

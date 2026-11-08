@@ -55,7 +55,10 @@ export const RecipeNutritionSchema = z.object({
 });
 export type RecipeNutrition = z.infer<typeof RecipeNutritionSchema>;
 
-export const MealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
+// The slot a log is filed under. 'beverage' exists so a cup of chai isn't
+// lunch; meal plans have their own slot enum (MealPlanSlotSchema) without it.
+// Widening this means widening MealLog_mealType_check in a migration.
+export const MealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'beverage']);
 export type MealType = z.infer<typeof MealTypeSchema>;
 
 export const MealLogSchema = z.object({
@@ -125,6 +128,33 @@ export const TodayLogsResponseSchema = z.object({
   }),
 });
 export type TodayLogsResponse = z.infer<typeof TodayLogsResponseSchema>;
+
+/**
+ * Fix a logged meal: file it under another meal, change how much was eaten,
+ * or replace what it was. Macros stay server-authoritative — `servings`
+ * scales the stored numbers, `items` re-prices from the nutrition tables —
+ * so the client never sends calories. At least one field is required.
+ */
+export const UpdateLogSchema = z
+  .object({
+    mealType: MealTypeSchema.optional(),
+    /** Multiplier on the logged amount: 2 = "I had twice that". */
+    servings: z.number().min(0.25).max(10).optional(),
+    /** What it actually was; replaces the name and every macro. */
+    items: z.array(CustomLogItemSchema).min(1).max(30).optional(),
+    name: z.string().trim().min(1).max(200).optional(),
+  })
+  .refine((u) => Object.values(u).some((v) => v !== undefined), { message: 'empty update' })
+  .refine((u) => !(u.items && u.servings !== undefined), {
+    message: 'send items or servings, not both',
+  });
+export type UpdateLog = z.infer<typeof UpdateLogSchema>;
+
+/** Meals logged on one UTC day — the "Your meals" page. Same shape as today's. */
+export const DayLogsResponseSchema = TodayLogsResponseSchema.extend({
+  date: z.string(), // YYYY-MM-DD
+});
+export type DayLogsResponse = z.infer<typeof DayLogsResponseSchema>;
 
 // ---------------------------------------------------------------------------
 // Streaks — logging habit, not goal adherence. The behaviour we want to

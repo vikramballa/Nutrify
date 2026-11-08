@@ -4,7 +4,10 @@ import {
   Animated,
   Easing,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   Text,
@@ -12,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { ChatMessage } from '@nutrichef/shared';
 import { colors } from '../theme/colors';
 import { SCREEN_PADDING, fonts, radii, type } from '../theme/typography';
@@ -64,6 +68,25 @@ export function AskScreen() {
   const [failure, setFailure] = useState<string | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
   const inputRef = useRef<TextInput>(null);
+  const insets = useSafeAreaInsets();
+  // Follow new content only while the reader is at the bottom. Scrolling on
+  // every size change yanked the list down on each typewriter tick, so an
+  // earlier answer couldn't be read while a new one was typing out.
+  const atBottom = useRef(true);
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    atBottom.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+  };
+  const scrollToEnd = (animated = true) =>
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated }));
+
+  // Opening the keyboard shrinks the list; keep the latest message in view.
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      if (atBottom.current) scrollToEnd();
+    });
+    return () => sub.remove();
+  }, []);
 
   const thread = history.data?.messages ?? [];
   const messages = thread.length > 0 ? thread : [WELCOME];
@@ -88,6 +111,8 @@ export function AskScreen() {
     const pending = editing;
     setText('');
     setEditing(null);
+    atBottom.current = true; // asking a question always jumps to its answer
+    scrollToEnd();
     try {
       if (pending) await edit.mutateAsync({ id: pending.id, message });
       else await send.mutateAsync(message);
@@ -96,7 +121,7 @@ export function AskScreen() {
       if (pending) setEditing(pending); // keep the edit alive so it can be retried
       setText(message);
     } finally {
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+      scrollToEnd();
     }
   }
 
@@ -144,6 +169,12 @@ export function AskScreen() {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // KeyboardAvoidingView compares its frame *relative to its parent* with
+        // the keyboard's screen position. Screen's safe-area padding puts that
+        // parent insets.top below the screen top, so without this offset it
+        // under-padded by the status-bar height and the keyboard hid most of
+        // the message box.
+        keyboardVerticalOffset={insets.top}
       >
         <View
           style={{
@@ -189,7 +220,12 @@ export function AskScreen() {
           keyExtractor={(m) => m.id}
           contentContainerStyle={{ paddingHorizontal: SCREEN_PADDING, paddingBottom: 16, gap: 14 }}
           keyboardShouldPersistTaps="handled"
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+          keyboardDismissMode="interactive"
+          onScroll={onScroll}
+          scrollEventThrottle={64}
+          onContentSizeChange={() => {
+            if (atBottom.current) listRef.current?.scrollToEnd({ animated: false });
+          }}
           renderItem={({ item }) => (
             <Bubble
               message={item}
@@ -533,7 +569,7 @@ function TypingBubble() {
   }, []);
 
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 14 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
       <LogoAvatar size={28} />
       <View
         style={{

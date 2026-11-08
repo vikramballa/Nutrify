@@ -15,6 +15,7 @@ const DEFAULT_HOURS: Record<MealType, number> = {
   lunch: 13,
   dinner: 20,
   snack: 16,
+  beverage: 11,
 };
 
 /** Meals that get a reminder. Snacks are not a habit worth nagging about. */
@@ -65,6 +66,7 @@ const COPY: Record<MealType, { title: string; body: string }> = {
   lunch: { title: 'Lunch time', body: 'Snap your plate or tap a recent meal.' },
   dinner: { title: 'Dinner', body: 'Round the day off — log what you ate.' },
   snack: { title: 'Snack', body: 'Log it so today stays accurate.' },
+  beverage: { title: 'Drinks', body: 'Tea or coffee today? Log it in two taps.' },
 };
 
 export function reminderCopy(mealType: MealType): { title: string; body: string } {

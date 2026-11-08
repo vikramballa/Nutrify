@@ -47,6 +47,17 @@ describe('Indian meals as people type them', () => {
     expect(kcal('1 cup', 'black coffee')?.grams).toBe(240);
   });
 
+  it('prices the Beverages picker drinks by the ml', () => {
+    expect(kcal('330 ml', 'soft drink')).toEqual({ grams: 330, calories: 139 });
+    expect(kcal('330 ml', 'diet soda')?.calories).toBe(0);
+    expect(kcal('150 ml', 'unsweetened tea')).toEqual({ grams: 150, calories: 45 });
+    expect(kcal('250 ml', 'fruit juice')?.calories).toBe(120);
+    expect(kcal('1', 'coke')?.calories).toBe(139); // a can
+    expect(kcal('1', 'Coke Zero')?.calories).toBe(0);
+    // A plain-food STATIC key that ends in the same place keeps winning.
+    expect(dishFor('orange juice')).toBeNull();
+  });
+
   it('means one serving when there is no number', () => {
     expect(kcal('', 'upma')?.grams).toBe(200);
     expect(kcal('1', 'pongal')?.grams).toBe(200); // not a piece
